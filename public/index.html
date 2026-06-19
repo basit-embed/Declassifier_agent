@@ -321,8 +321,17 @@
         </div>
       </div>
       <div class="output-body">
-        <div class="output-section-label">Declassified message — safe to share</div>
+
+        <div class="output-section-label">✅ Ready to send — copy this to your team</div>
+        <div style="position:relative;">
+          <div class="message-box" id="output-clean" style="border-color: rgba(61,186,126,0.3); padding-bottom: 2.5rem;"></div>
+          <button onclick="copyClean()" id="copy-clean-btn" style="position:absolute; bottom:10px; right:10px; background:var(--green); color:#0a1f14; border:none; border-radius:8px; padding:6px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--sans);">Copy</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="output-section-label">Full declassified view — with redaction markers</div>
         <div class="message-box" id="output-msg"></div>
+
         <div class="divider"></div>
         <div class="output-section-label">Task summary for team</div>
         <div class="summary-box" id="output-summary"></div>
@@ -495,6 +504,7 @@ ${msg}
 Return ONLY this JSON (no markdown):
 {
   "declassified_message": "full message with sensitive parts replaced by [REDACTED: CATEGORY] tokens",
+  "clean_message": "same message but replace every [REDACTED: CATEGORY] with a natural readable placeholder like [Client], [Budget], [Company], [Contact], [Location], [Date], [Project] — so the message reads naturally and is ready to forward to the team",
   "redacted_items": [{"category": "client_name|budget|etc", "original": "the actual text found", "token": "[REDACTED: CATEGORY]"}],
   "summary_for_team": "1-2 sentence plain task summary with zero sensitive information",
   "sensitivity_level": "low|medium|high",
@@ -512,6 +522,7 @@ Return ONLY this JSON (no markdown):
 {
   "extracted_text": "all text from the image verbatim",
   "declassified_message": "same text but sensitive parts replaced by [REDACTED: CATEGORY] tokens",
+  "clean_message": "same message but replace every [REDACTED: CATEGORY] with a natural readable placeholder like [Client], [Budget], [Company], [Contact], [Location], [Date], [Project] — so the message reads naturally and is ready to forward to the team",
   "redacted_items": [{"category": "client_name|budget|etc", "original": "the actual text", "token": "[REDACTED: CATEGORY]"}],
   "summary_for_team": "1-2 sentence plain task summary with zero sensitive information",
   "sensitivity_level": "low|medium|high",
@@ -527,6 +538,11 @@ function renderOutput(d) {
   document.getElementById('sensitivity-badge').textContent = label;
   document.getElementById('redact-count').textContent = `${(d.redacted_items || []).length} item${(d.redacted_items||[]).length !== 1 ? 's' : ''} redacted`;
 
+  // Clean ready-to-send message
+  const cleanEl = document.getElementById('output-clean');
+  cleanEl.textContent = d.clean_message || d.declassified_message || '';
+
+  // Annotated declassified message
   const msgEl = document.getElementById('output-msg');
   let html = escHtml(d.declassified_message || '');
   html = html.replace(/\[REDACTED:[^\]]*\]/g, m => `<span class="redact-token">${m}</span>`);
@@ -555,6 +571,15 @@ function renderOutput(d) {
 }
 
 // ── COPY / DOWNLOAD ──
+function copyClean() {
+  if (!currentOutput) return;
+  const text = currentOutput.clean_message || currentOutput.declassified_message || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-clean-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
 function copyOutput() {
   if (!currentOutput) return;
   const text = `DECLASSIFIED MESSAGE\n${'─'.repeat(40)}\n${currentOutput.declassified_message}\n\n${'─'.repeat(40)}\nTASK SUMMARY\n${currentOutput.summary_for_team}`;

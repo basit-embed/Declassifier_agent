@@ -176,6 +176,9 @@
   .mode-btn.on b { color:var(--accent); }
   .brief-note { display:none; font-size:13px; color:var(--text2); background:var(--accent-dim); border:1px solid rgba(79,142,247,0.2); border-radius:var(--radius); padding:12px 14px; line-height:1.6; }
   .brief-note b { color:var(--text); font-weight:600; }
+  .ask-box { display:none; margin-bottom:1.25rem; background:var(--accent-dim); border:1px solid rgba(79,142,247,0.3); border-radius:var(--radius); padding:12px 14px; font-size:13px; color:var(--text); }
+  .ask-box b { color:var(--accent); display:block; margin-bottom:4px; }
+  .ask-box ul { padding-left:1.1rem; color:var(--text2); }
   .risk-box { display:none; margin-bottom:1.25rem; background:var(--amber-dim); border:1px solid rgba(240,169,74,0.3); border-radius:var(--radius); padding:12px 14px; font-size:13px; color:var(--text); }
   .risk-box b { color:var(--amber); display:block; margin-bottom:4px; }
   .risk-box ul { padding-left:1.1rem; color:var(--text2); }
@@ -330,6 +333,7 @@
         </div>
       </div>
       <div class="output-body">
+        <div class="ask-box" id="ask-box"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
         <div class="risk-box" id="risk-box"><b>Check before you send</b><ul id="risk-list"></ul></div>
         <div class="output-section-label" id="clean-label">✅ Ready to send — copy this to your team</div>
         <div style="position:relative;">
@@ -404,7 +408,7 @@ function showApp() {
 }
 
 // ── STATE ──
-let activeTab = 'text', imageBase64 = null, imageMediaType = null, mode = 'msg';
+let activeTab = 'text', imageBase64 = null, imageMediaType = null, mode = 'msg', lastSource = '';
 let history = [], currentOutput = null;
 
 const TAGS = [
@@ -473,9 +477,11 @@ async function runAgent() {
   if (activeTab === 'text') {
     const msg = document.getElementById('msg-input').value.trim();
     if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }
+    lastSource = msg;
     userContent = [{ type:'text', text: buildTextPrompt(msg, tags) }];
   } else {
     if (!imageBase64) { toast('Upload an image first'); return; }
+    lastSource = '';
     userContent = [
       { type:'image', source:{ type:'base64', media_type: imageMediaType, data: imageBase64 } },
       { type:'text', text: buildImagePrompt(tags) }
@@ -483,28 +489,46 @@ async function runAgent() {
   }
   const btn = document.getElementById('run-btn');
   btn.disabled = true;
-  btn.innerHTML = '<div class="spinner-ring"></div> ' + (mode==='brief' ? 'Writing brief…' : 'Declassifying…');
+  btn.innerHTML = '<div class="spinner-ring"></div> ' + (mode==='brief' ? 'Writing brief… up to a minute' : 'Declassifying…');
   document.getElementById('output-wrap').classList.remove('show');
   try {
-    const res = await fetch('/api/declassify', {
+    let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 120000); });
+    const res = await Promise.race([timeout, fetch('/api/declassify', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         model:'claude-sonnet-4-6', max_tokens:4000,
         system:`You are a confidential message declassification agent. Strip sensitive business information from client messages before sharing with technical employees. Return ONLY valid JSON. No markdown fences. No extra text.`,
         messages:[{ role:'user', content: userContent }]
       })
-    });
-    const data = await res.json();
-    if (data.error) { toast('API error: ' + data.error.message); return; }
+    })]);
+    clearTimeout(timer);
+    const rawText = await res.text();
+    let data;
+    try { data = JSON.parse(rawText); }
+    catch (e) {
+      const looksHtml = /^\s*</.test(rawText);
+      toast(looksHtml
+        ? 'The server sent back a web page instead of data (status '+res.status+'). It may still be starting up or redeploying, so wait a minute and retry. Make sure you are using your Render address, not a preview or a saved file.'
+        : 'Unexpected reply from the server (status '+res.status+'): '+rawText.slice(0,120), 12000);
+      return;
+    }
+    if (data.error || !res.ok) { const m = data.error && (data.error.message || (typeof data.error==='string' ? data.error : JSON.stringify(data.error))); toast('API error ('+res.status+'): ' + (m || 'unknown'), 9000); return; }
     const raw = data.content.map(i=>i.text||'').join('');
     const parsed = JSON.parse(raw.replace(/^```json\s*|```\s*$/g,'').trim());
     parsed._mode = mode;
+    if (!parsed.declassified_message && lastSource) {
+      let t = lastSource;
+      (parsed.redacted_items||[]).filter(r=>r.original).sort((a,b)=>b.original.length-a.original.length)
+        .forEach(r=>{ t = t.split(r.original).join(r.token||'[REDACTED]'); });
+      parsed.declassified_message = t;
+    }
     currentOutput = parsed;
     renderOutput(parsed);
     saveHistory(parsed);
-  } catch(err) { console.error(err); toast('Error: '+err.message); }
-  btn.disabled = false;
-  btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="run-btn-label">' + (mode==='brief' ? 'Create freelancer brief' : 'Declassify message') + '</span>';
+  } catch(err) { console.error(err); toast(err.message==='TIMEOUT' ? 'Timed out after 2 minutes. The server may be waking up, so try again.' : 'Error: '+err.message); } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="run-btn-label">' + (mode==='brief' ? 'Create freelancer brief' : 'Declassify message') + '</span>';
+  }
 }
 
 const BRIEF_RULES = `You are preparing a task brief for a freelancer who works for an agency. The freelancer must NOT be able to work out who the end client is, and must not be able to find the original job on Upwork.
@@ -515,11 +539,11 @@ Do not invent requirements. If something important is missing, list it under que
 
 const BRIEF_SCHEMA = `Return ONLY this JSON (no markdown):
 {
-  "declassified_message": "the original text with each identifying part replaced by a [REDACTED: CATEGORY] token, so the user can audit what was removed",
-  "clean_message": "the finished freelancer brief as plain text, ready to paste into a chat. Use this layout, with a blank line between sections and '- ' for bullets: a one-line title, then Overview, Scope of work, Deliverables, Tech and skills, Acceptance criteria, Questions to clarify. Leave out any section that has nothing in it. No markdown symbols and no client identifying details.",
+  "clean_message": "the finished brief as plain text, ready to paste into a chat. RULES: (1) Do NOT write a title or heading line. Begin directly with the word Overview. (2) Use these section headers, each followed by its content, with a blank line between sections and '- ' for bullets: Overview, Scope of work, Tech and skills. (3) Write the Overview in a neutral, impersonal voice that says what work is needed, for example 'Engineer needed to support electronics production at factories in China, from process setup through to mass production quality control.' Never say that a company, startup, client or team is looking for or hiring someone, and never use we, our, or the client. (4) Add a Deliverables or Acceptance criteria section ONLY if the source text states them. Otherwise leave those sections out completely. (5) Never invent anything that is not in the source: no timelines, sign-off terms, rates, tools or cultural notes. Stay faithful to the source wording. (6) Do not include any questions in this text. No markdown symbols and no client identifying details.",
   "redacted_items": [{"category": "client_name|company|budget|job_title|links|location|indirect_clue|other", "original": "the exact text removed or generalized", "token": "[REDACTED: CATEGORY]"}],
   "summary_for_team": "one sentence describing the task with zero identifying details",
   "residual_risks": ["short notes on anything left in the brief that could still help someone identify the client, for example a very specific product feature. Use an empty array if you see none."],
+  "questions_for_client": ["important details missing from the source that the user should ask their own client before assigning the work, for example the expected weekly time commitment or the product types in scope. Use an empty array if nothing important is missing."],
   "sensitivity_level": "low|medium|high",
   "redact_count": 3
 }`;
@@ -595,10 +619,14 @@ function renderOutput(d) {
   document.getElementById('redact-count').textContent = `${(d.redacted_items||[]).length} item${(d.redacted_items||[]).length!==1?'s':''} redacted`;
   document.getElementById('output-clean').textContent = d.clean_message || d.declassified_message || '';
   document.getElementById('clean-label').textContent = d._mode==='brief' ? '✅ Freelancer brief — ready to send' : '✅ Ready to send — copy this to your team';
+  const asks = Array.isArray(d.questions_for_client) ? d.questions_for_client.filter(Boolean) : [];
+  document.getElementById('ask-list').innerHTML = asks.map(r=>`<li>${escHtml(r)}</li>`).join('');
+  document.getElementById('ask-box').style.display = (asks.length && d._mode==='brief') ? 'block' : 'none';
   const risks = Array.isArray(d.residual_risks) ? d.residual_risks.filter(Boolean) : [];
   document.getElementById('risk-list').innerHTML = risks.map(r=>`<li>${escHtml(r)}</li>`).join('');
   document.getElementById('risk-box').style.display = risks.length ? 'block' : 'none';
   const msgEl = document.getElementById('output-msg');
+  msgEl.previousElementSibling.style.display = msgEl.style.display = d.declassified_message ? '' : 'none';
   let html = escHtml(d.declassified_message||'');
   html = html.replace(/\[REDACTED:[^\]]*\]/g, m=>`<span class="redact-token">${m}</span>`);
   msgEl.innerHTML = html;
@@ -768,9 +796,9 @@ function restoreHistory(id) {
 }
 
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function toast(msg) {
+function toast(msg, ms) {
   const el = document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'), 2500);
+  setTimeout(()=>el.classList.remove('show'), ms||2500);
 }
 if (sessionStorage.getItem('cp_auth') === 'yes') showApp();
 </script>

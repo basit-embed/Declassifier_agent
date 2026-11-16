@@ -213,6 +213,12 @@
   .empty-state b{display:block;color:var(--text2);font-size:15px;margin-bottom:6px}
   .col-out:has(#output-wrap.show) .empty-state{display:none}
   @media (max-width:900px){.workspace{grid-template-columns:1fr}.col-out{position:static;max-height:none;overflow:visible}}
+
+  .more{margin-top:1.25rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2)}
+  .more>summary{cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:var(--text2);list-style:none}
+  .more>summary::before{content:'▸ ';color:var(--text3)}
+  .more[open]>summary::before{content:'▾ '}
+  .more-body{padding:0 14px 14px}
 </style>
 </head>
 <body>
@@ -389,6 +395,9 @@
           <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);padding-bottom:2.5rem;"></div>
           <button onclick="copyClean()" id="copy-clean-btn" style="position:absolute;bottom:10px;right:10px;background:var(--green);color:#0a1f14;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Copy</button>
         </div>
+        <details class="more" id="more-details">
+          <summary>Show details: what was removed and summary</summary>
+          <div class="more-body">
         <div class="divider"></div>
         <div class="output-section-label">Full declassified view — with redaction markers</div>
         <div class="message-box" id="output-msg"></div>
@@ -398,6 +407,8 @@
         <div class="divider"></div>
         <div class="output-section-label">What was redacted</div>
         <div id="output-redacted-wrap"></div>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -678,6 +689,7 @@ async function runAgent() {
 
 // ── RENDER ──
 function renderOutput(d) {
+  document.getElementById('more-details').open = false;
   const lb = document.getElementById('leak-box');
   if (d.leaks_fixed && d.leaks_fixed.length) { lb.style.display='block'; lb.innerHTML = '<b>Safety net triggered.</b> The AI left in ' + d.leaks_fixed.map(escHtml).join(', ') + ', so it was removed automatically. Re-read the text once before sending, since the wording around it may need a fix.'; } else { lb.style.display='none'; }
   const levelMap = { low:['status-low','🟢 Low sensitivity'], medium:['status-medium','🟡 Medium sensitivity'], high:['status-high','🔴 High sensitivity'] };

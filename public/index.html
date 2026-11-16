@@ -330,6 +330,7 @@
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><line x1="9" y1="9" x2="12" y2="9"/></svg>
             Word
           </button>
+          <button class="action-btn" onclick="downloadLog()" title="Private: contains the original client details. Do not share.">Private log</button>
         </div>
       </div>
       <div class="output-body">
@@ -653,110 +654,83 @@ function copyClean() {
   });
 }
 
-function getDocContent() {
+function exportParts() {
   if (!currentOutput) return null;
-  const ts = new Date().toLocaleString();
-  return {
-    clean: currentOutput.clean_message || currentOutput.declassified_message || '',
-    annotated: currentOutput.declassified_message || '',
-    summary: currentOutput.summary_for_team || '',
-    sensitivity: currentOutput.sensitivity_level || '',
-    items: currentOutput.redacted_items || [],
-    ts
-  };
+  const text = (currentOutput.clean_message || currentOutput.declassified_message || '').trim();
+  const isBrief = currentOutput._mode === 'brief';
+  const HEAD = /^(overview|scope of work|tech and skills|deliverables|acceptance criteria|requirements|skills|timeline)$/i;
+  const blocks = [];
+  text.split(/\r?\n/).forEach(line => {
+    const l = line.trim();
+    if (!l) { if (blocks.length && blocks[blocks.length-1].t !== 'gap') blocks.push({ t:'gap' }); return; }
+    const bare = l.replace(/:$/, '');
+    if (isBrief && HEAD.test(bare)) blocks.push({ t:'h', text: bare });
+    else if (/^[-•*]\s+/.test(l)) blocks.push({ t:'b', text: l.replace(/^[-•*]\s+/, '') });
+    else blocks.push({ t:'p', text: l });
+  });
+  return { text, blocks, isBrief };
 }
 
-function downloadTxt() {
-  const d = getDocContent(); if (!d) return;
-  const text = `CLEARPASS — DECLASSIFIED MESSAGE\nGenerated: ${d.ts}\nSensitivity: ${d.sensitivity}\nItems redacted: ${d.items.length}\n\n${'='.repeat(50)}\nREADY TO SEND\n${'='.repeat(50)}\n${d.clean}\n\n${'='.repeat(50)}\nTASK SUMMARY\n${'='.repeat(50)}\n${d.summary}\n\n${'='.repeat(50)}\nREDACTION LOG\n${'='.repeat(50)}\n${d.items.map(r=>`[${r.category}] "${r.original}" → ${r.token}`).join('\n')}`;
-  const blob = new Blob([text],{type:'text/plain'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download=`clearpass-${Date.now()}.txt`; a.click();
+function saveBlob(content, type, name) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   URL.revokeObjectURL(url);
+}
+function fileStem() { return (currentOutput && currentOutput._mode === 'brief' ? 'brief-' : 'message-') + new Date().toISOString().slice(0,10); }
+
+function downloadTxt() {
+  const d = exportParts(); if (!d) return;
+  saveBlob(d.text, 'text/plain', fileStem() + '.txt');
 }
 
 function downloadPdf() {
-  const d = getDocContent(); if (!d) return;
-  if (typeof window.jspdf === 'undefined') { toast('PDF library loading, try again in a moment'); return; }
+  const d = exportParts(); if (!d) return;
+  if (typeof window.jspdf === 'undefined') { toast('PDF library is still loading, try again in a moment'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'mm', format:'a4' });
-  const margin = 18, pageW = 210, maxW = pageW - margin*2;
-  let y = 20;
-
-  function addText(text, size, bold, color) {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setTextColor(...(color || [30,30,30]));
-    const lines = doc.splitTextToSize(String(text), maxW);
-    lines.forEach(line => {
-      if (y > 270) { doc.addPage(); y = 20; }
-      doc.text(line, margin, y);
-      y += size * 0.45;
+  const M = 20, W = 210 - M*2, LH = 5.6;
+  let y = 22;
+  const ensure = h => { if (y + h > 277) { doc.addPage(); y = 22; } };
+  doc.setTextColor(25,25,25);
+  d.blocks.forEach(b => {
+    if (b.t === 'gap') { y += 2.5; return; }
+    if (b.t === 'h') { y += 3; ensure(12); doc.setFont('helvetica','bold'); doc.setFontSize(12.5); doc.text(b.text, M, y); y += 7; return; }
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    const indent = b.t === 'b' ? 6 : 0;
+    doc.splitTextToSize(b.text, W - indent).forEach((ln, i) => {
+      ensure(LH);
+      if (b.t === 'b' && i === 0) doc.text('•', M + 1.5, y);
+      doc.text(ln, M + indent, y);
+      y += LH;
     });
-    y += 2;
-  }
-
-  addText('ClearPass — Declassified Message', 16, true, [30,30,30]);
-  addText(`Generated: ${d.ts}  |  Sensitivity: ${d.sensitivity}  |  ${d.items.length} items redacted`, 9, false, [120,120,120]);
-  y += 4;
-  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 6;
-
-  addText('READY TO SEND', 10, true, [61,186,126]);
-  addText(d.clean, 11, false);
-  y += 4;
-  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 6;
-
-  addText('TASK SUMMARY FOR TEAM', 10, true, [79,142,247]);
-  addText(d.summary, 11, false);
-  y += 4;
-  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 6;
-
-  addText('REDACTION LOG', 10, true, [200,80,80]);
-  d.items.forEach(r => addText(`[${r.category}]  "${r.original}"  →  ${r.token}`, 10, false, [100,100,100]));
-
-  doc.save(`clearpass-${Date.now()}.pdf`);
+  });
+  doc.save(fileStem() + '.pdf');
   toast('PDF downloaded');
 }
 
 function downloadWord() {
-  const d = getDocContent(); if (!d) return;
-  const redactionRows = d.items.map(r =>
-    `<tr><td style="padding:4px 8px;border:1px solid #ddd;color:#555;font-size:12px;">${r.category}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#c0392b;font-size:12px;">${r.original}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#888;font-size:12px;">${r.token}</td></tr>`
-  ).join('');
+  const d = exportParts(); if (!d) return;
+  let html = '', inList = false;
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  d.blocks.forEach(b => {
+    if (b.t === 'b') { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + escHtml(b.text) + '</li>'; return; }
+    closeList();
+    if (b.t === 'h') html += '<h3>' + escHtml(b.text) + '</h3>';
+    else if (b.t === 'p') html += '<p>' + escHtml(b.text) + '</p>';
+  });
+  closeList();
+  const page = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Brief</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.5;color:#111}h3{font-size:12pt;margin:14pt 0 4pt}p{margin:0 0 8pt}ul{margin:0 0 8pt 18pt}</style></head><body>' + html + '</body></html>';
+  saveBlob(page, 'application/msword', fileStem() + '.doc');
+  toast('Word file downloaded');
+}
 
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>ClearPass</title>
-<style>
-  body{font-family:Calibri,sans-serif;font-size:11pt;color:#1a1a1a;margin:2cm;}
-  h1{font-size:18pt;color:#1a1a1a;margin-bottom:4pt;}
-  h2{font-size:12pt;margin-top:18pt;margin-bottom:6pt;}
-  .meta{font-size:9pt;color:#888;margin-bottom:12pt;}
-  .section{background:#f8f9fa;border-left:4px solid #4f8ef7;padding:10pt 14pt;margin:10pt 0;font-size:11pt;line-height:1.6;}
-  .section-green{border-color:#3dba7e;}
-  .section-blue{border-color:#4f8ef7;}
-  table{border-collapse:collapse;width:100%;margin-top:8pt;}
-  th{background:#f0f0f0;padding:5pt 8pt;border:1px solid #ddd;font-size:9pt;text-align:left;}
-  hr{border:none;border-top:1px solid #ddd;margin:14pt 0;}
-</style></head>
-<body>
-<h1>ClearPass — Declassified Message</h1>
-<div class="meta">Generated: ${d.ts} &nbsp;|&nbsp; Sensitivity: ${d.sensitivity} &nbsp;|&nbsp; ${d.items.length} items redacted</div>
-<hr>
-<h2 style="color:#3dba7e;">✅ Ready to Send</h2>
-<div class="section section-green">${d.clean.replace(/\n/g,'<br>')}</div>
-<h2 style="color:#4f8ef7;">Task Summary for Team</h2>
-<div class="section section-blue">${d.summary}</div>
-<h2>Full Annotated Message</h2>
-<div class="section">${escHtml(d.annotated).replace(/\[REDACTED:[^\]]*\]/g, m=>`<span style="background:#fdecea;color:#c0392b;padding:1px 4px;border-radius:3px;font-family:Courier New,monospace;font-size:9pt;">${m}</span>`).replace(/\n/g,'<br>')}</div>
-<h2>Redaction Log</h2>
-<table><thead><tr><th>Category</th><th>Original value</th><th>Replaced with</th></tr></thead><tbody>${redactionRows}</tbody></table>
-</body></html>`;
-
-  const blob = new Blob([html],{type:'application/msword'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download=`clearpass-${Date.now()}.doc`; a.click();
-  URL.revokeObjectURL(url);
-  toast('Word doc downloaded');
+function downloadLog() {
+  if (!currentOutput) return;
+  const items = currentOutput.redacted_items || [];
+  const text = 'PRIVATE - CONTAINS THE ORIGINAL CLIENT DETAILS. DO NOT SHARE WITH YOUR TEAM OR FREELANCER.\n\n' +
+    'Generated: ' + new Date().toLocaleString() + '\n\n' +
+    (items.length ? items.map(r => '[' + (r.category||'') + '] "' + (r.original||'') + '"  ->  ' + (r.token||'')).join('\n') : 'Nothing was removed.');
+  saveBlob(text, 'text/plain', 'PRIVATE-redaction-log-' + new Date().toISOString().slice(0,10) + '.txt');
 }
 
 // ── HISTORY ──

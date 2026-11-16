@@ -151,7 +151,25 @@ function termsLine(terms) {
   return terms.length ? '\nKNOWN CLIENT DETAILS. Always remove every one of these, in any spelling, case, abbreviation or possessive form, and anything that clearly refers to them: ' + terms.map(t => JSON.stringify(t)).join(', ') + '.' : '';
 }
 
-function buildPrompt({ mode, text, hasImage, tags, custom, context, terms }) {
+const REPLY_RULES = `You are helping the owner of an agency write to their client. The agency has handed the work to a subcontractor. The client must never learn that a subcontractor, freelancer, Upwork contact or outside team exists.
+Below is a message from the subcontractor. Write the message the agency owner should send to the client, in the first person plural ("we", "our team"), as if the agency's own team did the work.
+RULES: (1) Never mention a freelancer, subcontractor, contractor, outsourcing or the subcontractor's name, location or platform. (2) Keep every fact, number, date and technical detail that the client needs, and invent nothing: no promises, deadlines, prices or results that are not in the subcontractor's message. (3) Turn the subcontractor's questions into clear questions for the client. (4) Turn a status update into a short, confident progress update. (5) Match the requested tone. (6) Plain text only, no markdown, no subject line, no sign-off name. (7) Keep it short and natural, like a real message between professionals.`;
+
+function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone }) {
+  if (mode === 'reply') {
+    return `${REPLY_RULES}
+Tone: ${tone}.
+${clientName ? 'Start with a greeting using this name: ' + clientName : 'Start with a simple greeting without a name.'}
+${context ? 'Extra instructions from the agency owner: ' + context : ''}
+
+Subcontractor's message:
+"""
+${text}
+"""
+
+Return ONLY this JSON (no markdown):
+{ "clean_message": "the message to send to the client" }`;
+  }
   if (mode === 'brief') {
     const head = hasImage
       ? 'Read all the text in this screenshot of an Upwork job post, then turn it into a freelancer brief.\n'
@@ -278,10 +296,11 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
 
   const b = req.body || {};
   const mode = b.mode;
-  if (mode !== 'msg' && mode !== 'brief') return fail(res, 400, 'Unknown mode.');
+  if (mode !== 'msg' && mode !== 'brief' && mode !== 'reply') return fail(res, 400, 'Unknown mode.');
 
   const text = typeof b.text === 'string' ? b.text.trim() : '';
   const img = b.image && typeof b.image === 'object' ? b.image : null;
+  if (mode === 'reply' && img) return fail(res, 400, 'Paste the reply as text.');
   if ((text ? 1 : 0) + (img ? 1 : 0) !== 1) return fail(res, 400, 'Send either text or an image.');
   if (text.length > MAX_TEXT) return fail(res, 400, `Text is too long. The limit is ${MAX_TEXT.toLocaleString()} characters.`);
   if (img) {
@@ -299,8 +318,10 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   const ip = ipLimit(req.ip);
   if (!ip.ok) return fail(res, 429, 'Too many requests from this network. Please wait and try again.');
 
-  const terms = Array.isArray(b.clientTerms) ? [...new Set(b.clientTerms.filter(t => typeof t === 'string').map(t => t.trim().slice(0, 100)).filter(t => t.length >= 2))].slice(0, 60) : [];
-  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms });
+  const terms = mode === 'reply' ? [] : Array.isArray(b.clientTerms) ? [...new Set(b.clientTerms.filter(t => typeof t === 'string').map(t => t.trim().slice(0, 100)).filter(t => t.length >= 2))].slice(0, 60) : [];
+  const clientName = typeof b.clientName === 'string' ? b.clientName.trim().slice(0, 60) : '';
+  const tone = ['friendly', 'professional', 'brief'].includes(b.tone) ? { friendly: 'warm and friendly', professional: 'formal and professional', brief: 'very short and direct' }[b.tone] : 'professional but warm';
+  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone });
   const content = img
     ? [{ type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];

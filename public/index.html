@@ -402,6 +402,27 @@
     </div>
   </div>
 
+
+  <div class="card" id="reply-card" style="margin-top:1rem">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+      Reply to your client
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">Paste what your freelancer wrote. You get a message for your client that never mentions the freelancer.</div>
+    <textarea id="reply-input" placeholder="Paste the freelancer's update or question here…" style="min-height:110px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <input id="reply-name" placeholder="Client first name (optional)" maxlength="60" style="flex:1;min-width:150px;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px" />
+      <select id="reply-tone" style="background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px">
+        <option value="friendly">Friendly</option><option value="professional" selected>Professional</option><option value="brief">Short and direct</option>
+      </select>
+      <button class="vault-btn" id="reply-btn" onclick="runReply()">Draft reply</button>
+    </div>
+    <div id="reply-out-wrap" style="display:none;margin-top:12px;position:relative">
+      <div class="output-section-label">Ready to send to your client</div>
+      <div class="message-box" id="reply-out" style="border-color:rgba(61,186,126,0.3);padding-bottom:2.5rem"></div>
+      <button onclick="copyReply()" style="position:absolute;bottom:10px;right:10px;background:var(--green);color:#0a1f14;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Copy</button>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -571,6 +592,30 @@ function vaultRestore(e) {
       vaultPersist(); vaultRender(); toast('Vault restored');
     } catch(err) { toast('That file is not a ClearPass vault backup'); } };
   r.readAsText(f); e.target.value = '';
+}
+
+// ── REPLY DRAFTER ──
+async function runReply() {
+  const text = document.getElementById('reply-input').value.trim();
+  if (!text) { toast('Paste the freelancer\'s message first'); return; }
+  const btn = document.getElementById('reply-btn'); btn.disabled = true; btn.textContent = 'Drafting…';
+  try {
+    let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 90000); });
+    const res = await Promise.race([timeout, fetch('/api/declassify', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'reply', text, clientName: document.getElementById('reply-name').value.trim(), tone: document.getElementById('reply-tone').value, context: document.getElementById('team-context').value.trim(), clientTerms: vaultTerms() }) })]);
+    clearTimeout(timer);
+    const raw = await res.text(); let data;
+    try { data = JSON.parse(raw); } catch(e) { toast('The server sent back a web page instead of data. It may be starting up, so try again in a minute.', 9000); return; }
+    if (res.status === 401) { sessionExpired(); return; }
+    if (!res.ok || !data.result) { toast((data.error && data.error.message) || ('Server error ('+res.status+')'), 9000); return; }
+    document.getElementById('reply-out').textContent = data.result.clean_message || '';
+    document.getElementById('reply-out-wrap').style.display = 'block';
+  } catch(err) { toast(err.message==='TIMEOUT' ? 'Timed out. Please try again.' : 'Error: '+err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Draft reply'; }
+}
+function copyReply() {
+  const t = document.getElementById('reply-out').textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(()=>toast('Copied'), ()=>toast('Select the text and copy it'));
 }
 
 // ── RUN ──

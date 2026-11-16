@@ -203,6 +203,57 @@
   .vault-editor input{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;font-family:var(--sans);font-size:14px;margin-bottom:8px;box-sizing:border-box}
   .vault-note{font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.5}
   .leak-box{background:var(--red-dim);border:1px solid rgba(232,92,92,.35);color:var(--text);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;display:none}
+
+  /* ── v7 layout ── */
+  .container{max-width:1180px;padding:1.5rem 1.5rem 3rem}
+  .workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+  .panel-out{position:sticky;top:72px;max-height:calc(100vh - 90px);overflow:auto;border-radius:var(--radius-lg)}
+  .workspace .card{margin-bottom:0}
+  .mode-switch{margin-bottom:.75rem}
+  .mode-btn{padding:9px 12px;text-align:center}
+  .mode-btn b{font-size:13.5px}
+  .hint{font-size:12.5px;color:var(--text2);margin:0 0 .85rem;line-height:1.5}
+  .brief-note{font-size:12.5px;padding:9px 12px;margin-bottom:.85rem}
+  .input-label{font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+  .tabs{margin-bottom:.85rem}
+  textarea#msg-input{min-height:230px}
+  .client-row{display:flex;gap:8px;align-items:center;margin-top:.85rem}
+  .client-row label{font-size:13px;color:var(--text2);white-space:nowrap}
+  .client-row select{flex:1;min-width:0;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px}
+  .tags-grid{margin-top:.85rem}
+  .opts{margin-top:.85rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2)}
+  .opts>summary,.more>summary{cursor:pointer;padding:10px 14px;font-size:13px;font-weight:600;color:var(--text2);list-style:none}
+  .opts>summary::before,.more>summary::before{content:'▸ ';color:var(--text3)}
+  .opts[open]>summary::before,.more[open]>summary::before{content:'▾ '}
+  .opts-body{padding:0 14px 14px}
+  .opts-body label{font-size:12.5px;color:var(--text2);display:block;margin:10px 0 6px}
+  .opts-body textarea{min-height:64px}
+  .run-btn{margin-top:1rem}
+  .empty-state{border:1px dashed var(--border2);border-radius:var(--radius-lg);padding:3rem 1.5rem;text-align:center;color:var(--text3);font-size:14px;line-height:1.7}
+  .empty-state b{display:block;color:var(--text2);font-size:15px;margin-bottom:6px}
+  .panel-out:has(#output-wrap.show) .empty-state{display:none}
+  #output-wrap{margin-top:0}
+  .output-card{margin-bottom:0}
+  .output-header{padding:.85rem 1.1rem}
+  .output-body{padding:1.1rem}
+  .copy-primary{background:var(--green);color:#0a1f14;border:none;font-weight:700}
+  .copy-primary:hover{color:#0a1f14;filter:brightness(1.08)}
+  .more{margin-top:1rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2)}
+  .more-body{padding:0 14px 14px}
+  .nav-btn{font-size:12.5px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:5px 13px;cursor:pointer;font-family:var(--sans)}
+  .nav-btn:hover{border-color:var(--border2);color:var(--text)}
+  .drawer-back{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400}
+  .drawer-back.open{display:block}
+  .history-section{position:fixed;top:0;right:0;bottom:0;width:min(380px,92vw);background:var(--bg);border-left:1px solid var(--border2);z-index:401;padding:1.25rem;overflow:auto;transform:translateX(105%);transition:transform .2s;margin:0}
+  .history-section.open{transform:none}
+  #vault-editor{position:fixed;z-index:500;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,92vw);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.25rem;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
+  .vault-editor h3{font-size:15px;margin-bottom:10px}
+  footer{margin-top:1.5rem;padding:1rem}
+  @media (max-width:900px){
+    .workspace{grid-template-columns:1fr}
+    .panel-out{position:static;max-height:none;overflow:visible}
+    .container{padding:1rem 1rem 2.5rem}
+  }
 </style>
 </head>
 <body>
@@ -238,39 +289,31 @@
     ClearPass
   </a>
   <div class="nav-right">
-    <div class="api-indicator"><div class="dot"></div> Claude API</div>
-    <div class="nav-pill" id="history-count">0 processed</div>
+    <button class="nav-btn" id="history-count" onclick="openDrawer()">Recent · 0</button>
     <button class="logout-btn" onclick="doLogout()">Sign out</button>
   </div>
 </nav>
 
 <main class="container">
-  <div class="hero">
-    <div class="hero-eyebrow">
-      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Confidential message declassifier
-    </div>
-    <h1>Strip sensitive info.<br /><span>Share only what matters.</span></h1>
-    <p>Paste client messages or upload screenshots. ClearPass redacts confidential details so your technical team gets the task, not the secrets.</p>
-  </div>
+<div class="workspace">
 
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span id="input-title">Client message</span>
-    </div>
+  <!-- LEFT: input -->
+  <section class="card" id="panel-in">
     <div class="mode-switch">
-      <button class="mode-btn on" id="mode-msg" onclick="setMode('msg')"><b>Client message</b><span>Remove names, budgets and sensitive details</span></button>
-      <button class="mode-btn" id="mode-brief" onclick="setMode('brief')"><b>Upwork job post to brief</b><span>Turn a job post into a task brief for your freelancer</span></button>
+      <button class="mode-btn on" id="mode-msg" onclick="setMode('msg')"><b>Hide details in a message</b></button>
+      <button class="mode-btn" id="mode-brief" onclick="setMode('brief')"><b>Upwork post → brief</b></button>
     </div>
+    <div class="hint" id="mode-hint">Removes names, budgets and other sensitive details so you can pass the task to your team.</div>
+    <div class="brief-note" id="brief-note"><b>Also removes clues that could identify the client</b>, such as industry + city + company size, so a freelancer can't search for the original job.</div>
+
     <div class="tabs">
       <button class="tab active" id="tab-text" onclick="switchTab('text')">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Text message
+        Paste text
       </button>
       <button class="tab" id="tab-image" onclick="switchTab('image')">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Image / screenshot
+        Upload screenshot
       </button>
     </div>
     <div id="text-panel">
@@ -287,116 +330,105 @@
         <img id="img-preview" alt="Uploaded preview" />
       </div>
     </div>
-  </div>
+    <span id="input-title" style="display:none"></span>
 
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-      Client vault
-    </div>
-    <div class="vault-row">
+    <div class="client-row">
+      <label for="vault-select">Client</label>
       <select id="vault-select" onchange="vaultSelect()"></select>
       <button class="vault-btn" onclick="vaultEdit(false)">Edit</button>
-      <button class="vault-btn" onclick="vaultEdit(true)">+ New client</button>
+      <button class="vault-btn" onclick="vaultEdit(true)">+ New</button>
     </div>
-    <div class="vault-editor" id="vault-editor">
-      <input id="vault-name" placeholder="Label for you only, e.g. Acme project" maxlength="60" />
-      <textarea id="vault-terms" placeholder="Everything about this client that must never reach a freelancer, one per line:&#10;Jane Miller&#10;Acme Robotics&#10;AcmeBot&#10;acme-robotics.com&#10;jane@acme-robotics.com" style="min-height:130px"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <button class="vault-btn" onclick="vaultSave()">Save client</button>
-        <button class="vault-btn danger" id="vault-del" onclick="vaultDelete()">Delete</button>
-        <button class="vault-btn" onclick="vaultClose()">Cancel</button>
-      </div>
-    </div>
-    <div class="vault-note">Pick a client and every run removes their saved names and details, even if the AI misses one. Saved only in this browser, never on our server. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-      What to redact
-    </div>
     <div class="tags-grid" id="tags-grid"></div>
-    <div class="brief-note" id="brief-note"><b>Brief mode strips everything that could identify the client.</b> That covers the client and company name, the budget, the exact job title, links and usernames, plus combinations like industry + city + company size that a freelancer could search for on Upwork. Add anything extra in the custom rules below.</div>
-    <div class="custom-rules-wrap">
-      <label>Custom rules (optional) — describe anything else to redact, one per line</label>
-      <textarea id="custom-rules" placeholder="e.g. Any mention of the word 'prototype'&#10;References to our pricing model&#10;Internal team member names"></textarea>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Team context (optional)
-    </div>
-    <textarea id="team-context" placeholder="e.g. This is going to the frontend dev team. Focus on technical tasks only." style="min-height:80px;"></textarea>
-  </div>
+    <details class="opts">
+      <summary>More options</summary>
+      <div class="opts-body">
+        <label for="custom-rules">Extra things to remove (one per line)</label>
+        <textarea id="custom-rules" placeholder="e.g. Any mention of the word 'prototype'&#10;Internal team member names"></textarea>
+        <label for="team-context">Who is this for? (optional)</label>
+        <textarea id="team-context" placeholder="e.g. Frontend dev team. Focus on technical tasks only."></textarea>
+      </div>
+    </details>
 
-  <button class="run-btn" id="run-btn" onclick="runAgent()">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    <span id="run-btn-label">Declassify message</span>
-  </button>
+    <button class="run-btn" id="run-btn" onclick="runAgent()">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span id="run-btn-label">Declassify message</span>
+    </button>
+  </section>
 
-  <!-- OUTPUT -->
-  <div id="output-wrap">
-    <div class="output-card">
-      <div class="output-header">
-        <div class="output-header-left">
-          <span id="sensitivity-badge" class="status-badge"></span>
-          <span id="redact-count" style="font-size:13px;color:var(--text2);"></span>
+  <!-- RIGHT: result -->
+  <section class="panel-out" id="panel-out">
+    <div class="empty-state"><b>Your result appears here</b>Paste a message on the left and press the button. You'll get text that is ready to copy and send.</div>
+
+    <div id="output-wrap">
+      <div class="output-card">
+        <div class="output-header">
+          <div class="output-header-left">
+            <span id="sensitivity-badge" class="status-badge"></span>
+            <span id="redact-count" style="font-size:13px;color:var(--text2);"></span>
+          </div>
+          <div class="output-actions">
+            <button class="action-btn copy-primary" onclick="copyClean()">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy
+            </button>
+            <button class="action-btn" onclick="downloadTxt()">.txt</button>
+            <button class="action-btn" onclick="downloadPdf()">PDF</button>
+            <button class="action-btn" onclick="downloadWord()">Word</button>
+          </div>
         </div>
-        <div class="output-actions">
-          <button class="action-btn" onclick="copyClean()">
-            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy
-          </button>
-          <button class="action-btn" onclick="downloadTxt()">
-            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 0-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            .txt
-          </button>
-          <button class="action-btn" onclick="downloadPdf()">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            PDF
-          </button>
-          <button class="action-btn" onclick="downloadWord()">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><line x1="9" y1="9" x2="12" y2="9"/></svg>
-            Word
-          </button>
-          <button class="action-btn" onclick="downloadLog()" title="Private: contains the original client details. Do not share.">Private log</button>
+        <div class="output-body">
+          <div class="leak-box" id="leak-box"></div>
+          <div class="risk-box" id="risk-box"><b>Check before you send</b><ul id="risk-list"></ul></div>
+          <div class="output-section-label" id="clean-label">✅ Ready to send — copy this to your team</div>
+          <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);"></div>
+          <div class="ask-box" id="ask-box" style="margin-top:1rem"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
+
+          <details class="more">
+            <summary>Details: what was removed, summary, private log</summary>
+            <div class="more-body">
+              <div class="output-section-label" style="margin-top:12px">Full view with redaction markers</div>
+              <div class="message-box" id="output-msg"></div>
+              <div class="divider"></div>
+              <div class="output-section-label">Task summary for team</div>
+              <div class="summary-box" id="output-summary"></div>
+              <div class="divider"></div>
+              <div class="output-section-label">What was redacted</div>
+              <div id="output-redacted-wrap"></div>
+              <div style="margin-top:12px"><button class="action-btn" onclick="downloadLog()" title="Private: contains the original client details. Do not share.">Download private log (contains originals)</button></div>
+            </div>
+          </details>
         </div>
       </div>
-      <div class="output-body">
-        <div class="leak-box" id="leak-box"></div>
-        <div class="ask-box" id="ask-box"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
-        <div class="risk-box" id="risk-box"><b>Check before you send</b><ul id="risk-list"></ul></div>
-        <div class="output-section-label" id="clean-label">✅ Ready to send — copy this to your team</div>
-        <div style="position:relative;">
-          <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);padding-bottom:2.5rem;"></div>
-          <button onclick="copyClean()" id="copy-clean-btn" style="position:absolute;bottom:10px;right:10px;background:var(--green);color:#0a1f14;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Copy</button>
-        </div>
-        <div class="divider"></div>
-        <div class="output-section-label">Full declassified view — with redaction markers</div>
-        <div class="message-box" id="output-msg"></div>
-        <div class="divider"></div>
-        <div class="output-section-label">Task summary for team</div>
-        <div class="summary-box" id="output-summary"></div>
-        <div class="divider"></div>
-        <div class="output-section-label">What was redacted</div>
-        <div id="output-redacted-wrap"></div>
-      </div>
     </div>
-  </div>
+  </section>
+</div>
 
-  <div class="history-section" id="history-section" style="display:none">
-    <div class="history-title">
-      Recent sessions
-      <button class="history-clear" onclick="clearHistory()">Clear all</button>
-    </div>
-    <div class="history-list" id="history-list"></div>
+<!-- Vault editor (pop-up) -->
+<div class="vault-editor" id="vault-editor">
+  <h3>Client vault</h3>
+  <input id="vault-name" placeholder="Label for you only, e.g. Acme project" maxlength="60" />
+  <textarea id="vault-terms" placeholder="Everything about this client that must never reach a freelancer, one per line:&#10;Jane Miller&#10;Acme Robotics&#10;AcmeBot&#10;acme-robotics.com&#10;jane@acme-robotics.com" style="min-height:130px"></textarea>
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <button class="vault-btn" onclick="vaultSave()">Save client</button>
+    <button class="vault-btn danger" id="vault-del" onclick="vaultDelete()">Delete</button>
+    <button class="vault-btn" onclick="vaultClose()">Cancel</button>
   </div>
+  <div class="vault-note">Saved only in this browser, never on our server. Every run removes this client's saved details, even if the AI misses one. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></div>
+</div>
+
+<div class="drawer-back" id="drawer-back" onclick="closeDrawer()"></div>
+<div class="history-section" id="history-section">
+  <div class="history-title">
+    Recent sessions
+    <span><button class="history-clear" onclick="clearHistory()">Clear all</button> <button class="history-clear" onclick="closeDrawer()">Close ✕</button></span>
+  </div>
+  <div class="history-list" id="history-list"></div>
+</div>
 </main>
 
-<footer>ClearPass — built with Claude AI &nbsp;·&nbsp; <a href="https://docs.anthropic.com" target="_blank">Anthropic docs</a></footer>
+<footer>ClearPass</footer>
 </div>
 
 <div id="toast"></div>
@@ -462,6 +494,7 @@ function renderTags() {
 
 function setMode(m) {
   mode = m;
+  document.getElementById('mode-hint').style.display = m==='msg' ? 'block' : 'none';
   document.getElementById('mode-msg').classList.toggle('on', m==='msg');
   document.getElementById('mode-brief').classList.toggle('on', m==='brief');
   document.getElementById('tags-grid').style.display = m==='msg' ? 'flex' : 'none';
@@ -555,6 +588,9 @@ function vaultRestore(e) {
   r.readAsText(f); e.target.value = '';
 }
 
+function openDrawer(){ document.getElementById('history-section').classList.add('open'); document.getElementById('drawer-back').classList.add('open'); }
+function closeDrawer(){ document.getElementById('history-section').classList.remove('open'); document.getElementById('drawer-back').classList.remove('open'); }
+
 // ── RUN ──
 async function runAgent() {
   const tags = getActiveTags();
@@ -645,7 +681,7 @@ function renderOutput(d) {
     }</tbody></table>`;
   }
   document.getElementById('output-wrap').classList.add('show');
-  document.getElementById('output-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
+  if (window.innerWidth <= 900) document.getElementById('panel-out').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 // ── DOWNLOADS ──
@@ -752,12 +788,11 @@ function clearHistory() { history=[]; localStorage.removeItem('cp_history'); ren
 function renderHistory() {
   const sec = document.getElementById('history-section');
   const list = document.getElementById('history-list');
-  document.getElementById('history-count').textContent = history.length+' processed';
-  if (!history.length) { sec.style.display='none'; return; }
-  sec.style.display='block';
+  document.getElementById('history-count').textContent = 'Recent · '+history.length;
+  if (!history.length) { list.innerHTML = '<div class="no-redactions">No sessions yet.</div>'; return; }
   const lvl = { low:'status-low', medium:'status-medium', high:'status-high' };
   list.innerHTML = history.map(h=>`
-    <div class="history-item" onclick="restoreHistory(${h.id})">
+    <div class="history-item" onclick="restoreHistory(${h.id});closeDrawer()">
       <div class="history-item-top">
         <div class="history-meta">
           <span class="history-badge status-badge ${lvl[h.sensitivity]||'status-medium'}" style="font-size:11px;padding:2px 8px;">${h.sensitivity}</span>

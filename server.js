@@ -147,6 +147,9 @@ const MSG_SCHEMA_IMAGE = `Return ONLY this JSON (no markdown):
   "redact_count": 3
 }`;
 
+const POACH_RULES = `
+ANTI-POACHING MODE. The reader must not be able to find or contact this client directly. Also remove or generalize: the names of platforms and marketplaces (Upwork, Fiverr, LinkedIn and similar), job, contract, proposal and invoice IDs, profile names and handles, links of any kind, hourly rates and payment terms, and any distinctive phrase, product description, slogan or unusual detail that could be typed into a search engine to find the client. Also generalize combinations such as industry + city + company size. Keep the task itself fully usable.`;
+
 function termsLine(terms) {
   return terms.length ? '\nKNOWN CLIENT DETAILS. Always remove every one of these, in any spelling, case, abbreviation or possessive form, and anything that clearly refers to them: ' + terms.map(t => JSON.stringify(t)).join(', ') + '.' : '';
 }
@@ -155,7 +158,7 @@ const REPLY_RULES = `You are helping the owner of an agency write to their clien
 Below is a message from the subcontractor. Write the message the agency owner should send to the client, in the first person plural ("we", "our team"), as if the agency's own team did the work.
 RULES: (1) Never mention a freelancer, subcontractor, contractor, outsourcing or the subcontractor's name, location or platform. (2) Keep every fact, number, date and technical detail that the client needs, and invent nothing: no promises, deadlines, prices or results that are not in the subcontractor's message. (3) Turn the subcontractor's questions into clear questions for the client. (4) Turn a status update into a short, confident progress update. (5) Match the requested tone. (6) Plain text only, no markdown, no subject line, no sign-off name. (7) Keep it short and natural, like a real message between professionals.`;
 
-function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone }) {
+function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict }) {
   if (mode === 'reply') {
     return `${REPLY_RULES}
 Tone: ${tone}.
@@ -181,12 +184,12 @@ ${context ? 'Context about the freelancer or team: ' + context : ''}${body}
 ${BRIEF_SCHEMA}`;
   }
   if (hasImage) {
-    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
+    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 ${MSG_SCHEMA_IMAGE}`;
   }
-  return `Declassify this client message. Redact: ${tags.join(', ')}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
+  return `Declassify this client message. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 Client message:
@@ -321,7 +324,7 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   const terms = mode === 'reply' ? [] : Array.isArray(b.clientTerms) ? [...new Set(b.clientTerms.filter(t => typeof t === 'string').map(t => t.trim().slice(0, 100)).filter(t => t.length >= 2))].slice(0, 60) : [];
   const clientName = typeof b.clientName === 'string' ? b.clientName.trim().slice(0, 60) : '';
   const tone = ['friendly', 'professional', 'brief'].includes(b.tone) ? { friendly: 'warm and friendly', professional: 'formal and professional', brief: 'very short and direct' }[b.tone] : 'professional but warm';
-  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone });
+  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true });
   const content = img
     ? [{ type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];

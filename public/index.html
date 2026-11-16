@@ -219,6 +219,10 @@
   .more>summary::before{content:'▸ ';color:var(--text3)}
   .more[open]>summary::before{content:'▾ '}
   .more-body{padding:0 14px 14px}
+
+  .strict-row{display:flex;gap:10px;align-items:flex-start;margin-top:1rem;font-size:13px;color:var(--text2);cursor:pointer;line-height:1.5}
+  .strict-row input{margin-top:3px;accent-color:var(--accent)}
+  .strict-row b{color:var(--text)}
 </style>
 </head>
 <body>
@@ -335,6 +339,7 @@
       What to redact
     </div>
     <div class="tags-grid" id="tags-grid"></div>
+    <label class="strict-row" id="strict-row"><input type="checkbox" id="strict-on" onchange="try{localStorage.setItem('cp_strict',this.checked?'1':'0')}catch(e){}" /> <span><b>Anti-poaching</b> — also hide anything a freelancer could search for (platform names, job IDs, rates, links, unique phrases)</span></label>
     <div class="brief-note" id="brief-note"><b>Brief mode strips everything that could identify the client.</b> That covers the client and company name, the budget, the exact job title, links and usernames, plus combinations like industry + city + company size that a freelancer could search for on Upwork. Add anything extra in the custom rules below.</div>
     <div class="custom-rules-wrap">
       <label>Custom rules (optional) — describe anything else to redact, one per line</label>
@@ -486,6 +491,7 @@ function showApp() {
   renderTags();
   loadHistory();
   vaultLoad();
+  try { document.getElementById('strict-on').checked = localStorage.getItem('cp_strict')==='1'; } catch(e) {}
 }
 
 // ── STATE ──
@@ -515,6 +521,7 @@ function setMode(m) {
   document.getElementById('mode-msg').classList.toggle('on', m==='msg');
   document.getElementById('mode-brief').classList.toggle('on', m==='brief');
   document.getElementById('tags-grid').style.display = m==='msg' ? 'flex' : 'none';
+  document.getElementById('strict-row').style.display = m==='msg' ? 'flex' : 'none';
   document.getElementById('brief-note').style.display = m==='brief' ? 'block' : 'none';
   document.getElementById('msg-input').placeholder = m==='brief'
     ? 'Paste the full Upwork job post here: title, description, budget, skills, everything…'
@@ -636,7 +643,7 @@ async function runAgent() {
   const payload = { mode, tags: mode==='brief' ? [] : tags,
     custom: document.getElementById('custom-rules').value.trim(),
     context: document.getElementById('team-context').value.trim(),
-    clientTerms: vaultTerms() };
+    clientTerms: vaultTerms(), strict: mode==='msg' && document.getElementById('strict-on').checked };
   if (activeTab === 'text') {
     const msg = document.getElementById('msg-input').value.trim();
     if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }

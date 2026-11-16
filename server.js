@@ -147,24 +147,28 @@ const MSG_SCHEMA_IMAGE = `Return ONLY this JSON (no markdown):
   "redact_count": 3
 }`;
 
-function buildPrompt({ mode, text, hasImage, tags, custom, context }) {
+function termsLine(terms) {
+  return terms.length ? '\nKNOWN CLIENT DETAILS. Always remove every one of these, in any spelling, case, abbreviation or possessive form, and anything that clearly refers to them: ' + terms.map(t => JSON.stringify(t)).join(', ') + '.' : '';
+}
+
+function buildPrompt({ mode, text, hasImage, tags, custom, context, terms }) {
   if (mode === 'brief') {
     const head = hasImage
       ? 'Read all the text in this screenshot of an Upwork job post, then turn it into a freelancer brief.\n'
       : '';
     const body = hasImage ? '' : `\n\nUpwork job post:\n"""\n${text}\n"""`;
-    return `${head}${BRIEF_RULES}${custom ? '\nAlso remove: ' + custom : ''}
+    return `${head}${BRIEF_RULES}${termsLine(terms)}${custom ? '\nAlso remove: ' + custom : ''}
 ${context ? 'Context about the freelancer or team: ' + context : ''}${body}
 
 ${BRIEF_SCHEMA}`;
   }
   if (hasImage) {
-    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${custom ? '\nAlso redact: ' + custom : ''}.
+    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 ${MSG_SCHEMA_IMAGE}`;
   }
-  return `Declassify this client message. Redact: ${tags.join(', ')}${custom ? '\nAlso redact: ' + custom : ''}.
+  return `Declassify this client message. Redact: ${tags.join(', ')}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 Client message:
@@ -201,6 +205,22 @@ function normalise(o) {
   if (o.declassified_message) out.declassified_message = String(o.declassified_message);
   if (o.extracted_text) out.extracted_text = String(o.extracted_text);
   return out;
+}
+
+// Safety net: remove any saved client term the AI left in the text meant for the freelancer.
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function scrubTerms(result, terms) {
+  const hit = [];
+  for (const t of [...terms].sort((a, b) => b.length - a.length)) {
+    const re = new RegExp('(?<![\\p{L}\\p{N}])' + escRe(t).replace(/\s+/g, '\\s+') + "(?:['\u2019]s?)?(?![\\p{L}\\p{N}])", 'giu');
+    let found = false;
+    for (const k of ['clean_message', 'summary_for_team']) {
+      if (re.test(result[k])) { found = true; re.lastIndex = 0; result[k] = result[k].replace(re, '').replace(/[ \t]{2,}/g, ' ').replace(/ +([,.;:!?])/g, '$1'); }
+      re.lastIndex = 0;
+    }
+    if (found) hit.push(t);
+  }
+  return hit;
 }
 
 async function callClaude(content) {
@@ -279,7 +299,8 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   const ip = ipLimit(req.ip);
   if (!ip.ok) return fail(res, 429, 'Too many requests from this network. Please wait and try again.');
 
-  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context });
+  const terms = Array.isArray(b.clientTerms) ? [...new Set(b.clientTerms.filter(t => typeof t === 'string').map(t => t.trim().slice(0, 100)).filter(t => t.length >= 2))].slice(0, 60) : [];
+  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms });
   const content = img
     ? [{ type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];
@@ -300,7 +321,10 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
       console.error('Unreadable AI reply:', raw.slice(0, 300));
       return fail(res, 502, 'The AI reply could not be read. Please try again.');
     }
-    return res.json({ result: normalise(parsed) });
+    const result = normalise(parsed);
+    const fixed = scrubTerms(result, terms);
+    if (fixed.length) result.leaks_fixed = fixed;
+    return res.json({ result });
   } catch (err) {
     console.error('Proxy error:', err);
     const timedOut = err && (err.name === 'TimeoutError' || err.name === 'AbortError');

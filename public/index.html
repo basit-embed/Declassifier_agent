@@ -193,6 +193,16 @@
     .hero h1 { font-size: 1.75rem; }
     .output-header { flex-direction: column; align-items: flex-start; }
   }
+
+  .vault-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .vault-row select{flex:1;min-width:180px;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;font-family:var(--sans);font-size:14px}
+  .vault-btn{background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer;font-family:var(--sans)}
+  .vault-btn:hover{border-color:var(--accent)}
+  .vault-btn.danger{color:var(--red)}
+  .vault-editor{display:none;margin-top:12px}
+  .vault-editor input{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;font-family:var(--sans);font-size:14px;margin-bottom:8px;box-sizing:border-box}
+  .vault-note{font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.5}
+  .leak-box{background:var(--red-dim);border:1px solid rgba(232,92,92,.35);color:var(--text);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13.5px;display:none}
 </style>
 </head>
 <body>
@@ -281,6 +291,28 @@
 
   <div class="card">
     <div class="card-title">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Client vault
+    </div>
+    <div class="vault-row">
+      <select id="vault-select" onchange="vaultSelect()"></select>
+      <button class="vault-btn" onclick="vaultEdit(false)">Edit</button>
+      <button class="vault-btn" onclick="vaultEdit(true)">+ New client</button>
+    </div>
+    <div class="vault-editor" id="vault-editor">
+      <input id="vault-name" placeholder="Label for you only, e.g. Acme project" maxlength="60" />
+      <textarea id="vault-terms" placeholder="Everything about this client that must never reach a freelancer, one per line:&#10;Jane Miller&#10;Acme Robotics&#10;AcmeBot&#10;acme-robotics.com&#10;jane@acme-robotics.com" style="min-height:130px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="vault-btn" onclick="vaultSave()">Save client</button>
+        <button class="vault-btn danger" id="vault-del" onclick="vaultDelete()">Delete</button>
+        <button class="vault-btn" onclick="vaultClose()">Cancel</button>
+      </div>
+    </div>
+    <div class="vault-note">Pick a client and every run removes their saved names and details, even if the AI misses one. Saved only in this browser, never on our server. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
       <svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
       What to redact
     </div>
@@ -334,6 +366,7 @@
         </div>
       </div>
       <div class="output-body">
+        <div class="leak-box" id="leak-box"></div>
         <div class="ask-box" id="ask-box"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
         <div class="risk-box" id="risk-box"><b>Check before you send</b><ul id="risk-list"></ul></div>
         <div class="output-section-label" id="clean-label">✅ Ready to send — copy this to your team</div>
@@ -402,6 +435,7 @@ function showApp() {
   document.getElementById('app-screen').classList.add('visible');
   renderTags();
   loadHistory();
+  vaultLoad();
 }
 
 // ── STATE ──
@@ -466,13 +500,69 @@ function handleImage(e) {
   reader.readAsDataURL(file);
 }
 
+
+// ── CLIENT VAULT (stored only in this browser) ──
+let vault = []; let vaultEditing = null;
+function vaultLoad() { try { vault = JSON.parse(localStorage.getItem('cp_clients')||'[]'); if (!Array.isArray(vault)) vault = []; } catch(e) { vault = []; } vaultRender(); }
+function vaultPersist() { try { localStorage.setItem('cp_clients', JSON.stringify(vault)); } catch(e) { toast('Could not save in this browser'); } }
+function vaultRender() {
+  const sel = document.getElementById('vault-select'); const cur = sel.value;
+  sel.innerHTML = '<option value="">No saved client</option>' + vault.map(c=>`<option value="${escHtml(c.id)}">${escHtml(c.name)} (${c.terms.length} terms)</option>`).join('');
+  if (vault.some(c=>c.id===cur)) sel.value = cur;
+}
+function vaultSelect() { /* selection is read at run time */ }
+function vaultTerms() {
+  const c = vault.find(c=>c.id===document.getElementById('vault-select').value);
+  return c ? c.terms : [];
+}
+function vaultEdit(isNew) {
+  const sel = document.getElementById('vault-select');
+  const c = isNew ? null : vault.find(c=>c.id===sel.value);
+  if (!isNew && !c) { toast('Pick a client to edit, or choose + New client'); return; }
+  vaultEditing = c ? c.id : null;
+  document.getElementById('vault-name').value = c ? c.name : '';
+  document.getElementById('vault-terms').value = c ? c.terms.join('\n') : '';
+  document.getElementById('vault-del').style.display = c ? 'inline-block' : 'none';
+  document.getElementById('vault-editor').style.display = 'block';
+}
+function vaultClose() { document.getElementById('vault-editor').style.display = 'none'; vaultEditing = null; }
+function vaultSave() {
+  const name = document.getElementById('vault-name').value.trim();
+  const terms = [...new Set(document.getElementById('vault-terms').value.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>s.slice(0,100)))].slice(0,60);
+  if (!name) { toast('Give the client a label'); return; }
+  if (!terms.length) { toast('Add at least one name or detail to hide'); return; }
+  let id = vaultEditing;
+  if (id) { const c = vault.find(c=>c.id===id); c.name = name; c.terms = terms; }
+  else { id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); vault.push({ id, name, terms }); }
+  vaultPersist(); vaultRender(); document.getElementById('vault-select').value = id; vaultClose(); toast('Client saved');
+}
+function vaultDelete() {
+  if (!vaultEditing || !confirm('Delete this client from the vault?')) return;
+  vault = vault.filter(c=>c.id!==vaultEditing); vaultPersist(); vaultRender(); vaultClose();
+}
+function vaultBackup() {
+  if (!vault.length) { toast('Nothing to back up yet'); return; }
+  saveBlob(new Blob([JSON.stringify(vault,null,2)],{type:'application/json'}), 'clearpass-client-vault.json');
+}
+function vaultRestore(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { try {
+      const a = JSON.parse(ev.target.result); if (!Array.isArray(a)) throw 0;
+      a.forEach(c => { if (c && typeof c.name==='string' && Array.isArray(c.terms)) vault.push({ id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name:c.name.slice(0,60), terms:c.terms.map(String).slice(0,60) }); });
+      vaultPersist(); vaultRender(); toast('Vault restored');
+    } catch(err) { toast('That file is not a ClearPass vault backup'); } };
+  r.readAsText(f); e.target.value = '';
+}
+
 // ── RUN ──
 async function runAgent() {
   const tags = getActiveTags();
   if (!tags.length) { toast('Select at least one redaction category'); return; }
   const payload = { mode, tags: mode==='brief' ? [] : tags,
     custom: document.getElementById('custom-rules').value.trim(),
-    context: document.getElementById('team-context').value.trim() };
+    context: document.getElementById('team-context').value.trim(),
+    clientTerms: vaultTerms() };
   if (activeTab === 'text') {
     const msg = document.getElementById('msg-input').value.trim();
     if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }
@@ -525,6 +615,8 @@ async function runAgent() {
 
 // ── RENDER ──
 function renderOutput(d) {
+  const lb = document.getElementById('leak-box');
+  if (d.leaks_fixed && d.leaks_fixed.length) { lb.style.display='block'; lb.innerHTML = '<b>Safety net triggered.</b> The AI left in ' + d.leaks_fixed.map(escHtml).join(', ') + ', so it was removed automatically. Re-read the text once before sending, since the wording around it may need a fix.'; } else { lb.style.display='none'; }
   const levelMap = { low:['status-low','🟢 Low sensitivity'], medium:['status-medium','🟡 Medium sensitivity'], high:['status-high','🔴 High sensitivity'] };
   const [cls, label] = levelMap[d.sensitivity_level] || ['status-medium','Unknown'];
   document.getElementById('sensitivity-badge').className = 'status-badge '+cls;

@@ -4,102 +4,101 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ClearPass — Message Declassifier</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0d0f12;
-    --surface: #161a20;
-    --surface2: #1e232b;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.13);
-    --accent: #4f8ef7;
-    --accent-dim: rgba(79,142,247,0.12);
-    --accent-glow: rgba(79,142,247,0.25);
-    --red: #e85c5c;
-    --red-dim: rgba(232,92,92,0.12);
-    --green: #3dba7e;
-    --green-dim: rgba(61,186,126,0.12);
-    --amber: #f0a94a;
-    --amber-dim: rgba(240,169,74,0.12);
-    --text: #e8eaf0;
-    --text2: #8b909e;
-    --text3: #555b6a;
-    --mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-    --sans: 'Inter', system-ui, -apple-system, sans-serif;
-    --radius: 10px;
-    --radius-lg: 16px;
+    --bg: #0d0f12; --surface: #161a20; --surface2: #1e232b;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --accent: #4f8ef7; --accent-dim: rgba(79,142,247,0.12);
+    --red: #e85c5c; --red-dim: rgba(232,92,92,0.12);
+    --green: #3dba7e; --green-dim: rgba(61,186,126,0.12);
+    --amber: #f0a94a; --amber-dim: rgba(240,169,74,0.12);
+    --text: #e8eaf0; --text2: #8b909e; --text3: #555b6a;
+    --mono: 'JetBrains Mono','Fira Code','Courier New',monospace;
+    --sans: 'Inter',system-ui,-apple-system,sans-serif;
+    --radius: 10px; --radius-lg: 16px;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; min-height: 100vh; }
 
-  body {
+  /* ── LOGIN SCREEN ── */
+  #login-screen {
+    position: fixed; inset: 0; z-index: 1000;
     background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 15px;
-    line-height: 1.6;
-    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
   }
+  #login-screen.hidden { display: none; }
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: var(--radius-lg); padding: 2.5rem 2rem;
+    width: 100%; max-width: 380px; text-align: center;
+  }
+  .login-logo { width: 48px; height: 48px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+  .login-logo svg { width: 24px; height: 24px; fill: none; stroke: white; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .login-box h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .login-box p { font-size: 14px; color: var(--text2); margin-bottom: 2rem; }
+  .login-field { margin-bottom: 1rem; text-align: left; }
+  .login-field label { font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: 0.04em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .login-field input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 11px 14px; color: var(--text);
+    font-size: 14px; font-family: var(--sans); outline: none; transition: border-color 0.15s;
+  }
+  .login-field input:focus { border-color: var(--accent); }
+  .login-btn {
+    width: 100%; padding: 12px; font-size: 15px; font-weight: 600;
+    background: var(--accent); color: white; border: none;
+    border-radius: var(--radius); cursor: pointer; font-family: var(--sans);
+    transition: background 0.15s; margin-top: 0.5rem;
+  }
+  .login-btn:hover { background: #6aa0f8; }
+  .login-error { font-size: 13px; color: var(--red); margin-top: 0.75rem; min-height: 20px; }
+  .login-hint { font-size: 12px; color: var(--text3); margin-top: 1.25rem; }
+
+  /* ── APP ── */
+  #app-screen { display: none; }
+  #app-screen.visible { display: block; }
 
   /* ── NAV ── */
   nav {
     position: sticky; top: 0; z-index: 100;
-    background: rgba(13,15,18,0.85);
-    backdrop-filter: blur(12px);
+    background: rgba(13,15,18,0.85); backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
-    padding: 0 1.5rem;
-    display: flex; align-items: center; justify-content: space-between;
-    height: 56px;
+    padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; height: 56px;
   }
   .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; color: var(--text); text-decoration: none; }
   .nav-logo { width: 28px; height: 28px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
   .nav-logo svg { width: 16px; height: 16px; fill: none; stroke: white; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-right { display: flex; align-items: center; gap: 10px; }
   .nav-pill { font-size: 12px; color: var(--text2); background: var(--surface2); border: 1px solid var(--border); border-radius: 99px; padding: 4px 12px; }
   .api-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s ease infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .logout-btn { font-size: 12px; color: var(--text3); background: none; border: 1px solid var(--border); border-radius: 99px; padding: 4px 12px; cursor: pointer; font-family: var(--sans); transition: all 0.15s; }
+  .logout-btn:hover { color: var(--red); border-color: rgba(232,92,92,0.3); }
 
-  /* ── LAYOUT ── */
   .container { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
-  /* ── HERO ── */
   .hero { text-align: center; margin-bottom: 3rem; }
   .hero-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(79,142,247,0.2); border-radius: 99px; padding: 4px 12px; margin-bottom: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; }
-  .hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 0.75rem; }
+  .hero h1 { font-size: clamp(2rem,5vw,3rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 0.75rem; }
   .hero h1 span { color: var(--accent); }
   .hero p { color: var(--text2); font-size: 16px; max-width: 480px; margin: 0 auto; }
 
-
-
-  /* ── CARD ── */
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1rem; }
   .card-title { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
   .card-title svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ── TABS ── */
   .tabs { display: flex; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 3px; gap: 3px; margin-bottom: 1.25rem; }
   .tab { flex: 1; padding: 8px; border: none; border-radius: 7px; background: transparent; color: var(--text2); font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s; font-family: var(--sans); }
   .tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
   .tab svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ── TEXTAREA ── */
-  textarea {
-    width: 100%; min-height: 140px; resize: vertical;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 12px; color: var(--text);
-    font-size: 14px; font-family: var(--sans); line-height: 1.6; outline: none;
-    transition: border-color 0.15s;
-  }
+  textarea { width: 100%; min-height: 140px; resize: vertical; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; color: var(--text); font-size: 14px; font-family: var(--sans); line-height: 1.6; outline: none; transition: border-color 0.15s; }
   textarea:focus { border-color: var(--accent); }
   textarea::placeholder { color: var(--text3); }
 
-  /* ── UPLOAD ── */
-  .upload-zone {
-    border: 1px dashed var(--border2); border-radius: var(--radius);
-    padding: 2rem; text-align: center; cursor: pointer;
-    background: var(--surface2); transition: all 0.15s;
-    position: relative;
-  }
+  .upload-zone { border: 1px dashed var(--border2); border-radius: var(--radius); padding: 2rem; text-align: center; cursor: pointer; background: var(--surface2); transition: all 0.15s; position: relative; }
   .upload-zone:hover { border-color: var(--accent); background: var(--accent-dim); }
   .upload-zone.has-image { padding: 0.75rem; }
   .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
@@ -109,42 +108,25 @@
   .upload-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
   #img-preview { max-width: 100%; max-height: 220px; border-radius: 8px; display: none; object-fit: contain; }
 
-  /* ── REDACT TAGS ── */
   .tags-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-  .tag-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 13px; border-radius: 99px; font-size: 13px; font-weight: 500;
-    border: 1px solid var(--border); background: var(--surface2);
-    color: var(--text2); cursor: pointer; transition: all 0.15s;
-    user-select: none; font-family: var(--sans);
-  }
+  .tag-btn { display: flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 99px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; transition: all 0.15s; user-select: none; font-family: var(--sans); }
   .tag-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .tag-btn:hover { border-color: var(--border2); color: var(--text); }
   .tag-btn.on { background: var(--accent-dim); border-color: rgba(79,142,247,0.35); color: var(--accent); }
 
-  /* ── CUSTOM RULES ── */
   .custom-rules-wrap { margin-top: 1rem; }
   .custom-rules-wrap label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px; }
   .custom-rules-wrap textarea { min-height: 72px; font-family: var(--mono); font-size: 12px; }
 
-  /* ── RUN BUTTON ── */
-  .run-btn {
-    width: 100%; padding: 13px; font-size: 15px; font-weight: 600;
-    background: var(--accent); color: white; border: none;
-    border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: all 0.15s; font-family: var(--sans); letter-spacing: -0.01em; margin-top: 1rem;
-  }
+  .run-btn { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; background: var(--accent); color: white; border: none; border-radius: var(--radius); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; font-family: var(--sans); letter-spacing: -0.01em; margin-top: 1rem; }
   .run-btn:hover:not(:disabled) { background: #6aa0f8; }
   .run-btn:active:not(:disabled) { transform: scale(0.99); }
   .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .run-btn svg { width: 16px; height: 16px; fill: none; stroke: white; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .spinner-ring { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── OUTPUT ── */
-  #output-wrap { display: none; }
+  #output-wrap { display: none; margin-top: 1.25rem; }
   #output-wrap.show { display: block; }
-
   .output-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1rem; }
   .output-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .output-header-left { display: flex; align-items: center; gap: 10px; }
@@ -152,7 +134,7 @@
   .status-low { background: var(--green-dim); color: var(--green); border: 1px solid rgba(61,186,126,0.2); }
   .status-medium { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,169,74,0.2); }
   .status-high { background: var(--red-dim); color: var(--red); border: 1px solid rgba(232,92,92,0.2); }
-  .output-actions { display: flex; gap: 8px; }
+  .output-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .action-btn { display: flex; align-items: center; gap: 5px; padding: 6px 12px; font-size: 12px; font-weight: 500; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text2); cursor: pointer; transition: all 0.15s; font-family: var(--sans); }
   .action-btn:hover { border-color: var(--border2); color: var(--text); }
   .action-btn svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -164,7 +146,6 @@
   .divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
   .summary-box { background: var(--accent-dim); border: 1px solid rgba(79,142,247,0.2); border-radius: var(--radius); padding: 1rem; font-size: 14px; color: var(--text); line-height: 1.6; }
 
-  /* ── REDACTED LIST ── */
   .redacted-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .redacted-table th { text-align: left; padding: 6px 8px; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px solid var(--border); }
   .redacted-table td { padding: 8px 8px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: top; }
@@ -173,7 +154,6 @@
   .redacted-table td.category { color: var(--text3); font-size: 12px; }
   .no-redactions { color: var(--text3); font-size: 14px; font-style: italic; text-align: center; padding: 1rem; }
 
-  /* ── HISTORY ── */
   .history-section { margin-top: 2.5rem; }
   .history-title { font-size: 13px; font-weight: 600; color: var(--text2); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; }
   .history-clear { font-size: 12px; color: var(--text3); background: none; border: none; cursor: pointer; font-family: var(--sans); }
@@ -187,16 +167,24 @@
   .history-meta { display: flex; gap: 8px; margin-top: 6px; }
   .history-badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
 
-  /* ── TOAST ── */
-  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 16px; font-size: 13px; color: var(--text); z-index: 999; opacity: 0; transform: translateY(8px); transition: all 0.2s; pointer-events: none; }
+  .mode-switch { display:flex; gap:6px; margin-bottom:1rem; }
+  .mode-btn { flex:1; text-align:left; padding:10px 14px; border-radius:var(--radius); border:1px solid var(--border); background:var(--surface2); color:var(--text2); cursor:pointer; font-family:var(--sans); transition:all 0.15s; }
+  .mode-btn b { display:block; font-size:13px; font-weight:600; color:var(--text); }
+  .mode-btn span { font-size:12px; }
+  .mode-btn:hover { border-color:var(--border2); }
+  .mode-btn.on { border-color:rgba(79,142,247,0.45); background:var(--accent-dim); }
+  .mode-btn.on b { color:var(--accent); }
+  .brief-note { display:none; font-size:13px; color:var(--text2); background:var(--accent-dim); border:1px solid rgba(79,142,247,0.2); border-radius:var(--radius); padding:12px 14px; line-height:1.6; }
+  .brief-note b { color:var(--text); font-weight:600; }
+  .risk-box { display:none; margin-bottom:1.25rem; background:var(--amber-dim); border:1px solid rgba(240,169,74,0.3); border-radius:var(--radius); padding:12px 14px; font-size:13px; color:var(--text); }
+  .risk-box b { color:var(--amber); display:block; margin-bottom:4px; }
+  .risk-box ul { padding-left:1.1rem; color:var(--text2); }
+  #toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 16px; font-size: 13px; color: var(--text); z-index: 9999; opacity: 0; transform: translateY(8px); transition: all 0.2s; pointer-events: none; }
   #toast.show { opacity: 1; transform: translateY(0); }
 
-  /* ── FOOTER ── */
   footer { text-align: center; padding: 2rem 1.5rem; border-top: 1px solid var(--border); color: var(--text3); font-size: 12px; margin-top: 3rem; }
   footer a { color: var(--text2); text-decoration: none; }
-  footer a:hover { color: var(--text); }
 
-  /* ── RESPONSIVE ── */
   @media (max-width: 600px) {
     .container { padding: 1.5rem 1rem 3rem; }
     .hero h1 { font-size: 1.75rem; }
@@ -206,24 +194,44 @@
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <a href="#" class="nav-brand">
-    <div class="nav-logo">
+<!-- ── LOGIN SCREEN ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     </div>
+    <h2>ClearPass</h2>
+    <p>Sign in to access the declassifier</p>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="Enter username" autocomplete="username" />
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign in</button>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-hint">Contact your admin for credentials</div>
+  </div>
+</div>
+
+<!-- ── APP SCREEN ── -->
+<div id="app-screen">
+
+<nav>
+  <a href="#" class="nav-brand">
+    <div class="nav-logo"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
     ClearPass
   </a>
   <div class="nav-right">
     <div class="api-indicator"><div class="dot"></div> Claude API</div>
     <div class="nav-pill" id="history-count">0 processed</div>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
   </div>
 </nav>
 
-<!-- MAIN -->
 <main class="container">
-
-  <!-- HERO -->
   <div class="hero">
     <div class="hero-eyebrow">
       <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -233,15 +241,15 @@
     <p>Paste client messages or upload screenshots. ClearPass redacts confidential details so your technical team gets the task, not the secrets.</p>
   </div>
 
-
-
-  <!-- INPUT CARD -->
   <div class="card">
     <div class="card-title">
       <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      Client message
+      <span id="input-title">Client message</span>
     </div>
-
+    <div class="mode-switch">
+      <button class="mode-btn on" id="mode-msg" onclick="setMode('msg')"><b>Client message</b><span>Remove names, budgets and sensitive details</span></button>
+      <button class="mode-btn" id="mode-brief" onclick="setMode('brief')"><b>Upwork job post to brief</b><span>Turn a job post into a task brief for your freelancer</span></button>
+    </div>
     <div class="tabs">
       <button class="tab active" id="tab-text" onclick="switchTab('text')">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -252,18 +260,14 @@
         Image / screenshot
       </button>
     </div>
-
     <div id="text-panel">
       <textarea id="msg-input" placeholder="Paste the client's message, email, or request here…"></textarea>
     </div>
-
     <div id="image-panel" style="display:none">
       <div class="upload-zone" id="upload-zone">
         <input type="file" id="file-input" accept="image/*" onchange="handleImage(event)" />
         <div id="upload-placeholder">
-          <div class="upload-icon">
-            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          </div>
+          <div class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
           <div class="upload-label">Click or drag to upload</div>
           <div class="upload-sub">PNG, JPG, WEBP — screenshots, emails, docs</div>
         </div>
@@ -272,66 +276,69 @@
     </div>
   </div>
 
-  <!-- REDACT CONFIG -->
   <div class="card">
     <div class="card-title">
       <svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
       What to redact
     </div>
-    <div class="tags-grid" id="tags-grid">
-      <!-- injected by JS -->
-    </div>
+    <div class="tags-grid" id="tags-grid"></div>
+    <div class="brief-note" id="brief-note"><b>Brief mode strips everything that could identify the client.</b> That covers the client and company name, the budget, the exact job title, links and usernames, plus combinations like industry + city + company size that a freelancer could search for on Upwork. Add anything extra in the custom rules below.</div>
     <div class="custom-rules-wrap">
       <label>Custom rules (optional) — describe anything else to redact, one per line</label>
       <textarea id="custom-rules" placeholder="e.g. Any mention of the word 'prototype'&#10;References to our pricing model&#10;Internal team member names"></textarea>
     </div>
   </div>
 
-  <!-- OUTPUT CONTEXT -->
   <div class="card">
     <div class="card-title">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Team context (optional)
     </div>
-    <textarea id="team-context" placeholder="e.g. This is going to the frontend dev team. Focus on technical tasks only. They need to know about UI bugs, API changes, feature requests — not timelines or costs." style="min-height:80px;"></textarea>
+    <textarea id="team-context" placeholder="e.g. This is going to the frontend dev team. Focus on technical tasks only." style="min-height:80px;"></textarea>
   </div>
 
   <button class="run-btn" id="run-btn" onclick="runAgent()">
-    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    Declassify message
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <span id="run-btn-label">Declassify message</span>
   </button>
 
   <!-- OUTPUT -->
   <div id="output-wrap">
-    <div class="output-card" id="output-card">
+    <div class="output-card">
       <div class="output-header">
         <div class="output-header-left">
           <span id="sensitivity-badge" class="status-badge"></span>
-          <span id="redact-count" style="font-size:13px; color:var(--text2);"></span>
+          <span id="redact-count" style="font-size:13px;color:var(--text2);"></span>
         </div>
         <div class="output-actions">
-          <button class="action-btn" onclick="copyOutput()">
+          <button class="action-btn" onclick="copyClean()">
             <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy for team
+            Copy
           </button>
-          <button class="action-btn" onclick="downloadOutput()">
+          <button class="action-btn" onclick="downloadTxt()">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 0-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download
+            .txt
+          </button>
+          <button class="action-btn" onclick="downloadPdf()">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            PDF
+          </button>
+          <button class="action-btn" onclick="downloadWord()">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><line x1="9" y1="9" x2="12" y2="9"/></svg>
+            Word
           </button>
         </div>
       </div>
       <div class="output-body">
-
-        <div class="output-section-label">✅ Ready to send — copy this to your team</div>
+        <div class="risk-box" id="risk-box"><b>Check before you send</b><ul id="risk-list"></ul></div>
+        <div class="output-section-label" id="clean-label">✅ Ready to send — copy this to your team</div>
         <div style="position:relative;">
-          <div class="message-box" id="output-clean" style="border-color: rgba(61,186,126,0.3); padding-bottom: 2.5rem;"></div>
-          <button onclick="copyClean()" id="copy-clean-btn" style="position:absolute; bottom:10px; right:10px; background:var(--green); color:#0a1f14; border:none; border-radius:8px; padding:6px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--sans);">Copy</button>
+          <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);padding-bottom:2.5rem;"></div>
+          <button onclick="copyClean()" id="copy-clean-btn" style="position:absolute;bottom:10px;right:10px;background:var(--green);color:#0a1f14;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Copy</button>
         </div>
-
         <div class="divider"></div>
         <div class="output-section-label">Full declassified view — with redaction markers</div>
         <div class="message-box" id="output-msg"></div>
-
         <div class="divider"></div>
         <div class="output-section-label">Task summary for team</div>
         <div class="summary-box" id="output-summary"></div>
@@ -342,7 +349,6 @@
     </div>
   </div>
 
-  <!-- HISTORY -->
   <div class="history-section" id="history-section" style="display:none">
     <div class="history-title">
       Recent sessions
@@ -350,85 +356,109 @@
     </div>
     <div class="history-list" id="history-list"></div>
   </div>
-
 </main>
 
-<footer>
-  ClearPass — built with Claude AI &nbsp;·&nbsp; API key stays in your browser &nbsp;·&nbsp; <a href="https://docs.anthropic.com" target="_blank">Anthropic docs</a>
-</footer>
+<footer>ClearPass — built with Claude AI &nbsp;·&nbsp; <a href="https://docs.anthropic.com" target="_blank">Anthropic docs</a></footer>
+</div>
 
 <div id="toast"></div>
 
 <script>
-// ── STATE ──
-let activeTab = 'text';
-let imageBase64 = null;
-let imageMediaType = null;
-let history = [];
-let currentOutput = null;
+// ── CREDENTIALS (change these) ──
+const USERS = {
+  'admin': 'clearpass2024',
+  'cofounder': 'secure123'
+};
 
-const TAGS = [
-  { key: 'client_name',   label: 'Client name',    icon: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`, on: true },
-  { key: 'budget',        label: 'Budget / amounts',icon: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`, on: true },
-  { key: 'company',       label: 'Company name',    icon: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`, on: true },
-  { key: 'contact_info',  label: 'Contact info',    icon: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`, on: true },
-  { key: 'location',      label: 'Location',        icon: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`, on: true },
-  { key: 'dates',         label: 'Dates / deadlines',icon:`<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`, on: true },
-  { key: 'project_name',  label: 'Project name',    icon: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`, on: false },
-  { key: 'legal',         label: 'Legal / contracts',icon:`<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`, on: false },
-  { key: 'personal_details', label: 'Personal details', icon:`<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 11l5-5 5 5"/><path d="M12 6v12"/></svg>`, on: false },
-];
+// ── LOGIN ──
 
-// ── INIT ──
-(function init() {
-  renderTags();
-  loadHistory();
-  const saved = localStorage.getItem('cp_apikey');
-  if (saved) {
-    document.getElementById('api-key-input').value = saved;
-    document.getElementById('setup-banner').style.display = 'none';
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-error');
+  if (USERS[u] && USERS[u] === p) {
+    sessionStorage.setItem('cp_auth', 'yes');
+    sessionStorage.setItem('cp_user', u);
+    err.textContent = '';
+    showApp();
+  } else {
+    err.textContent = 'Incorrect username or password.';
+    document.getElementById('login-pass').value = '';
   }
-})();
-
-function renderTags() {
-  const grid = document.getElementById('tags-grid');
-  grid.innerHTML = TAGS.map(t => `
-    <button class="tag-btn ${t.on ? 'on' : ''}" data-key="${t.key}" onclick="toggleTag(this)">
-      ${t.icon} ${t.label}
-    </button>
-  `).join('');
 }
 
-function toggleTag(el) {
-  el.classList.toggle('on');
+function doLogout() {
+  sessionStorage.removeItem('cp_auth');
+  sessionStorage.removeItem('cp_user');
+  document.getElementById('app-screen').classList.remove('visible');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+function showApp() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.add('visible');
+  renderTags();
+  loadHistory();
+}
+
+// ── STATE ──
+let activeTab = 'text', imageBase64 = null, imageMediaType = null, mode = 'msg';
+let history = [], currentOutput = null;
+
+const TAGS = [
+  { key: 'client_name',      label: 'Client name',      on: true  },
+  { key: 'budget',           label: 'Budget / amounts',  on: true  },
+  { key: 'company',          label: 'Company name',      on: true  },
+  { key: 'contact_info',     label: 'Contact info',      on: true  },
+  { key: 'location',         label: 'Location',          on: true  },
+  { key: 'dates',            label: 'Dates / deadlines', on: true  },
+  { key: 'project_name',     label: 'Project name',      on: false },
+  { key: 'legal',            label: 'Legal / contracts', on: false },
+  { key: 'personal_details', label: 'Personal details',  on: false },
+];
+
+function renderTags() {
+  document.getElementById('tags-grid').innerHTML = TAGS.map(t =>
+    `<button class="tag-btn ${t.on?'on':''}" data-key="${t.key}" onclick="this.classList.toggle('on')">${t.label}</button>`
+  ).join('');
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('mode-msg').classList.toggle('on', m==='msg');
+  document.getElementById('mode-brief').classList.toggle('on', m==='brief');
+  document.getElementById('tags-grid').style.display = m==='msg' ? 'flex' : 'none';
+  document.getElementById('brief-note').style.display = m==='brief' ? 'block' : 'none';
+  document.getElementById('msg-input').placeholder = m==='brief'
+    ? 'Paste the full Upwork job post here: title, description, budget, skills, everything…'
+    : "Paste the client's message, email, or request here…";
+  document.getElementById('input-title').textContent = m==='brief' ? 'Upwork job post' : 'Client message';
+  document.getElementById('run-btn-label').textContent = m==='brief' ? 'Create freelancer brief' : 'Declassify message';
 }
 
 function getActiveTags() {
+  if (mode === 'brief') return ['strict_brief'];
   return Array.from(document.querySelectorAll('.tag-btn.on')).map(b => b.dataset.key);
 }
 
-
-
-// ── TABS ──
 function switchTab(tab) {
   activeTab = tab;
-  document.getElementById('text-panel').style.display = tab === 'text' ? 'block' : 'none';
-  document.getElementById('image-panel').style.display = tab === 'image' ? 'block' : 'none';
-  document.getElementById('tab-text').classList.toggle('active', tab === 'text');
-  document.getElementById('tab-image').classList.toggle('active', tab === 'image');
+  document.getElementById('text-panel').style.display = tab==='text'?'block':'none';
+  document.getElementById('image-panel').style.display = tab==='image'?'block':'none';
+  document.getElementById('tab-text').classList.toggle('active', tab==='text');
+  document.getElementById('tab-image').classList.toggle('active', tab==='image');
 }
 
-// ── IMAGE UPLOAD ──
 function handleImage(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const file = e.target.files[0]; if (!file) return;
   imageMediaType = file.type;
   const reader = new FileReader();
   reader.onload = ev => {
     imageBase64 = ev.target.result.split(',')[1];
     const preview = document.getElementById('img-preview');
-    preview.src = ev.target.result;
-    preview.style.display = 'block';
+    preview.src = ev.target.result; preview.style.display = 'block';
     document.getElementById('upload-placeholder').style.display = 'none';
     document.getElementById('upload-zone').classList.add('has-image');
   };
@@ -439,62 +469,79 @@ function handleImage(e) {
 async function runAgent() {
   const tags = getActiveTags();
   if (!tags.length) { toast('Select at least one redaction category'); return; }
-
   let userContent = [];
-
   if (activeTab === 'text') {
     const msg = document.getElementById('msg-input').value.trim();
-    if (!msg) { toast('Paste a client message first'); return; }
-    userContent = [{ type: 'text', text: buildTextPrompt(msg, tags) }];
+    if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }
+    userContent = [{ type:'text', text: buildTextPrompt(msg, tags) }];
   } else {
     if (!imageBase64) { toast('Upload an image first'); return; }
     userContent = [
-      { type: 'image', source: { type: 'base64', media_type: imageMediaType, data: imageBase64 } },
-      { type: 'text', text: buildImagePrompt(tags) }
+      { type:'image', source:{ type:'base64', media_type: imageMediaType, data: imageBase64 } },
+      { type:'text', text: buildImagePrompt(tags) }
     ];
   }
-
   const btn = document.getElementById('run-btn');
   btn.disabled = true;
-  btn.innerHTML = '<div class="spinner-ring"></div> Declassifying…';
+  btn.innerHTML = '<div class="spinner-ring"></div> ' + (mode==='brief' ? 'Writing brief…' : 'Declassifying…');
   document.getElementById('output-wrap').classList.remove('show');
-
   try {
     const res = await fetch('/api/declassify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1500,
-        system: `You are a confidential message declassification agent. You strip sensitive business information from client messages before sharing with technical employees. Return ONLY valid JSON. No markdown fences. No extra text.`,
-        messages: [{ role: 'user', content: userContent }]
+        model:'claude-sonnet-4-6', max_tokens:4000,
+        system:`You are a confidential message declassification agent. Strip sensitive business information from client messages before sharing with technical employees. Return ONLY valid JSON. No markdown fences. No extra text.`,
+        messages:[{ role:'user', content: userContent }]
       })
     });
-
     const data = await res.json();
     if (data.error) { toast('API error: ' + data.error.message); return; }
-
-    const raw = data.content.map(i => i.text || '').join('');
-    const clean = raw.replace(/^```json\s*|```\s*$/g, '').trim();
-    const parsed = JSON.parse(clean);
-
+    const raw = data.content.map(i=>i.text||'').join('');
+    const parsed = JSON.parse(raw.replace(/^```json\s*|```\s*$/g,'').trim());
+    parsed._mode = mode;
     currentOutput = parsed;
     renderOutput(parsed);
     saveHistory(parsed);
-  } catch (err) {
-    console.error(err);
-    toast('Error: ' + err.message);
-  }
-
+  } catch(err) { console.error(err); toast('Error: '+err.message); }
   btn.disabled = false;
-  btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Declassify message`;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="run-btn-label">' + (mode==='brief' ? 'Create freelancer brief' : 'Declassify message') + '</span>';
 }
 
+const BRIEF_RULES = `You are preparing a task brief for a freelancer who works for an agency. The freelancer must NOT be able to work out who the end client is, and must not be able to find the original job on Upwork.
+REMOVE completely: client name, company/brand/product name, the exact job title, the client's budget, rates and payment terms, links, URLs, usernames and emails, and the client's country, city and time zone.
+ALSO REMOVE or generalize indirect clues that could be searched for: combinations such as industry + city + company size + funding stage, distinctive product descriptions, named competitors, named integrations that only this client uses, and unusual deadlines tied to a public event. Replace these with generic wording (for example "a B2B SaaS product" or "an early-stage startup").
+KEEP everything the freelancer needs to do the work: the actual tasks, deliverables, technologies and versions, platforms, functional requirements, acceptance criteria and general priorities.
+Do not invent requirements. If something important is missing, list it under questions to clarify.`;
+
+const BRIEF_SCHEMA = `Return ONLY this JSON (no markdown):
+{
+  "declassified_message": "the original text with each identifying part replaced by a [REDACTED: CATEGORY] token, so the user can audit what was removed",
+  "clean_message": "the finished freelancer brief as plain text, ready to paste into a chat. Use this layout, with a blank line between sections and '- ' for bullets: a one-line title, then Overview, Scope of work, Deliverables, Tech and skills, Acceptance criteria, Questions to clarify. Leave out any section that has nothing in it. No markdown symbols and no client identifying details.",
+  "redacted_items": [{"category": "client_name|company|budget|job_title|links|location|indirect_clue|other", "original": "the exact text removed or generalized", "token": "[REDACTED: CATEGORY]"}],
+  "summary_for_team": "one sentence describing the task with zero identifying details",
+  "residual_risks": ["short notes on anything left in the brief that could still help someone identify the client, for example a very specific product feature. Use an empty array if you see none."],
+  "sensitivity_level": "low|medium|high",
+  "redact_count": 3
+}`;
+
 function buildTextPrompt(msg, tags) {
+  if (mode === 'brief') {
+    const custom = document.getElementById('custom-rules').value.trim();
+    const ctx = document.getElementById('team-context').value.trim();
+    return `${BRIEF_RULES}${custom?'\nAlso remove: '+custom:''}
+${ctx?'Context about the freelancer or team: '+ctx:''}
+
+Upwork job post:
+"""
+${msg}
+"""
+
+${BRIEF_SCHEMA}`;
+  }
   const custom = document.getElementById('custom-rules').value.trim();
   const ctx = document.getElementById('team-context').value.trim();
-  return `Declassify this client message. Redact: ${tags.join(', ')}${custom ? `\nAlso redact: ${custom}` : ''}.
-${ctx ? `Team context: ${ctx}` : ''}
+  return `Declassify this client message. Redact: ${tags.join(', ')}${custom?'\nAlso redact: '+custom:''}.
+${ctx?'Team context: '+ctx:''}
 
 Client message:
 """
@@ -504,8 +551,8 @@ ${msg}
 Return ONLY this JSON (no markdown):
 {
   "declassified_message": "full message with sensitive parts replaced by [REDACTED: CATEGORY] tokens",
-  "clean_message": "same message but replace every [REDACTED: CATEGORY] with a natural readable placeholder like [Client], [Budget], [Company], [Contact], [Location], [Date], [Project] — so the message reads naturally and is ready to forward to the team",
-  "redacted_items": [{"category": "client_name|budget|etc", "original": "the actual text found", "token": "[REDACTED: CATEGORY]"}],
+  "clean_message": "same message but completely remove every [REDACTED: CATEGORY] token and any surrounding punctuation or words that no longer make sense without it, so the message reads naturally and fluently with nothing missing or awkward. For example 'Hey [REDACTED: CLIENT_NAME],' becomes just 'Hey,' and 'budget is [REDACTED: BUDGET]' becomes just remove that clause entirely.",
+  "redacted_items": [{"category": "client_name|budget|etc", "original": "actual text found", "token": "[REDACTED: CATEGORY]"}],
   "summary_for_team": "1-2 sentence plain task summary with zero sensitive information",
   "sensitivity_level": "low|medium|high",
   "redact_count": 3
@@ -513,156 +560,219 @@ Return ONLY this JSON (no markdown):
 }
 
 function buildImagePrompt(tags) {
+  if (mode === 'brief') {
+    const custom = document.getElementById('custom-rules').value.trim();
+    const ctx = document.getElementById('team-context').value.trim();
+    return `Read all the text in this screenshot of an Upwork job post, then turn it into a freelancer brief.
+${BRIEF_RULES}${custom?'\nAlso remove: '+custom:''}
+${ctx?'Context about the freelancer or team: '+ctx:''}
+
+${BRIEF_SCHEMA}`;
+  }
   const custom = document.getElementById('custom-rules').value.trim();
   const ctx = document.getElementById('team-context').value.trim();
-  return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${custom ? `\nAlso redact: ${custom}` : ''}.
-${ctx ? `Team context: ${ctx}` : ''}
+  return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${custom?'\nAlso redact: '+custom:''}.
+${ctx?'Team context: '+ctx:''}
 
 Return ONLY this JSON (no markdown):
 {
   "extracted_text": "all text from the image verbatim",
   "declassified_message": "same text but sensitive parts replaced by [REDACTED: CATEGORY] tokens",
-  "clean_message": "same message but replace every [REDACTED: CATEGORY] with a natural readable placeholder like [Client], [Budget], [Company], [Contact], [Location], [Date], [Project] — so the message reads naturally and is ready to forward to the team",
-  "redacted_items": [{"category": "client_name|budget|etc", "original": "the actual text", "token": "[REDACTED: CATEGORY]"}],
+  "clean_message": "same message but completely remove every [REDACTED: CATEGORY] token and any surrounding punctuation or words that no longer make sense without it, so the message reads naturally and fluently. For example 'Hey [REDACTED: CLIENT_NAME],' becomes just 'Hey,' and 'budget is [REDACTED: BUDGET]' becomes remove that clause entirely.",
+  "redacted_items": [{"category": "client_name|budget|etc", "original": "actual text", "token": "[REDACTED: CATEGORY]"}],
   "summary_for_team": "1-2 sentence plain task summary with zero sensitive information",
   "sensitivity_level": "low|medium|high",
   "redact_count": 3
 }`;
 }
 
-// ── RENDER OUTPUT ──
+// ── RENDER ──
 function renderOutput(d) {
-  const levelMap = { low: ['status-low', '🟢 Low sensitivity'], medium: ['status-medium', '🟡 Medium sensitivity'], high: ['status-high', '🔴 High sensitivity'] };
-  const [cls, label] = levelMap[d.sensitivity_level] || ['status-medium', 'Unknown'];
-  document.getElementById('sensitivity-badge').className = 'status-badge ' + cls;
+  const levelMap = { low:['status-low','🟢 Low sensitivity'], medium:['status-medium','🟡 Medium sensitivity'], high:['status-high','🔴 High sensitivity'] };
+  const [cls, label] = levelMap[d.sensitivity_level] || ['status-medium','Unknown'];
+  document.getElementById('sensitivity-badge').className = 'status-badge '+cls;
   document.getElementById('sensitivity-badge').textContent = label;
-  document.getElementById('redact-count').textContent = `${(d.redacted_items || []).length} item${(d.redacted_items||[]).length !== 1 ? 's' : ''} redacted`;
-
-  // Clean ready-to-send message
-  const cleanEl = document.getElementById('output-clean');
-  cleanEl.textContent = d.clean_message || d.declassified_message || '';
-
-  // Annotated declassified message
+  document.getElementById('redact-count').textContent = `${(d.redacted_items||[]).length} item${(d.redacted_items||[]).length!==1?'s':''} redacted`;
+  document.getElementById('output-clean').textContent = d.clean_message || d.declassified_message || '';
+  document.getElementById('clean-label').textContent = d._mode==='brief' ? '✅ Freelancer brief — ready to send' : '✅ Ready to send — copy this to your team';
+  const risks = Array.isArray(d.residual_risks) ? d.residual_risks.filter(Boolean) : [];
+  document.getElementById('risk-list').innerHTML = risks.map(r=>`<li>${escHtml(r)}</li>`).join('');
+  document.getElementById('risk-box').style.display = risks.length ? 'block' : 'none';
   const msgEl = document.getElementById('output-msg');
-  let html = escHtml(d.declassified_message || '');
-  html = html.replace(/\[REDACTED:[^\]]*\]/g, m => `<span class="redact-token">${m}</span>`);
+  let html = escHtml(d.declassified_message||'');
+  html = html.replace(/\[REDACTED:[^\]]*\]/g, m=>`<span class="redact-token">${m}</span>`);
   msgEl.innerHTML = html;
-
   document.getElementById('output-summary').textContent = d.summary_for_team || '—';
-
   const redWrap = document.getElementById('output-redacted-wrap');
-  if (!d.redacted_items || d.redacted_items.length === 0) {
-    redWrap.innerHTML = '<div class="no-redactions">Nothing sensitive detected in this message.</div>';
+  if (!d.redacted_items || !d.redacted_items.length) {
+    redWrap.innerHTML = '<div class="no-redactions">Nothing sensitive detected.</div>';
   } else {
-    redWrap.innerHTML = `<table class="redacted-table">
-      <thead><tr><th>Category</th><th>Original value</th><th>Replaced with</th></tr></thead>
-      <tbody>${d.redacted_items.map(r => `
-        <tr>
-          <td class="category">${escHtml(r.category || '')}</td>
-          <td class="original">${escHtml(r.original || '')}</td>
-          <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">${escHtml(r.token || '')}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+    redWrap.innerHTML = `<table class="redacted-table"><thead><tr><th>Category</th><th>Original value</th><th>Replaced with</th></tr></thead><tbody>${
+      d.redacted_items.map(r=>`<tr><td class="category">${escHtml(r.category||'')}</td><td class="original">${escHtml(r.original||'')}</td><td style="font-family:var(--mono);font-size:12px;color:var(--text3)">${escHtml(r.token||'')}</td></tr>`).join('')
+    }</tbody></table>`;
   }
-
   document.getElementById('output-wrap').classList.add('show');
-  document.getElementById('output-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('output-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
-// ── COPY / DOWNLOAD ──
+// ── DOWNLOADS ──
 function copyClean() {
   if (!currentOutput) return;
-  const text = currentOutput.clean_message || currentOutput.declassified_message || '';
-  navigator.clipboard.writeText(text).then(() => {
+  navigator.clipboard.writeText(currentOutput.clean_message || currentOutput.declassified_message || '').then(() => {
     const btn = document.getElementById('copy-clean-btn');
     btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 2000);
+    setTimeout(()=>btn.textContent='Copy', 2000);
   });
 }
-function copyOutput() {
-  if (!currentOutput) return;
-  const text = `DECLASSIFIED MESSAGE\n${'─'.repeat(40)}\n${currentOutput.declassified_message}\n\n${'─'.repeat(40)}\nTASK SUMMARY\n${currentOutput.summary_for_team}`;
-  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard'));
+
+function getDocContent() {
+  if (!currentOutput) return null;
+  const ts = new Date().toLocaleString();
+  return {
+    clean: currentOutput.clean_message || currentOutput.declassified_message || '',
+    annotated: currentOutput.declassified_message || '',
+    summary: currentOutput.summary_for_team || '',
+    sensitivity: currentOutput.sensitivity_level || '',
+    items: currentOutput.redacted_items || [],
+    ts
+  };
 }
 
-function downloadOutput() {
-  if (!currentOutput) return;
-  const ts = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
-  const text = `CLEARPASS DECLASSIFIED MESSAGE\nGenerated: ${new Date().toLocaleString()}\nSensitivity: ${currentOutput.sensitivity_level}\nItems redacted: ${(currentOutput.redacted_items||[]).length}\n\n${'='.repeat(50)}\nDECLASSIFIED MESSAGE\n${'='.repeat(50)}\n${currentOutput.declassified_message}\n\n${'='.repeat(50)}\nTASK SUMMARY FOR TEAM\n${'='.repeat(50)}\n${currentOutput.summary_for_team}\n\n${'='.repeat(50)}\nREDACTION LOG\n${'='.repeat(50)}\n${(currentOutput.redacted_items||[]).map(r=>`[${r.category}] "${r.original}" → ${r.token}`).join('\n')}`;
-  const blob = new Blob([text], { type: 'text/plain' });
+function downloadTxt() {
+  const d = getDocContent(); if (!d) return;
+  const text = `CLEARPASS — DECLASSIFIED MESSAGE\nGenerated: ${d.ts}\nSensitivity: ${d.sensitivity}\nItems redacted: ${d.items.length}\n\n${'='.repeat(50)}\nREADY TO SEND\n${'='.repeat(50)}\n${d.clean}\n\n${'='.repeat(50)}\nTASK SUMMARY\n${'='.repeat(50)}\n${d.summary}\n\n${'='.repeat(50)}\nREDACTION LOG\n${'='.repeat(50)}\n${d.items.map(r=>`[${r.category}] "${r.original}" → ${r.token}`).join('\n')}`;
+  const blob = new Blob([text],{type:'text/plain'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `clearpass-${ts}.txt`; a.click();
+  const a = document.createElement('a'); a.href=url; a.download=`clearpass-${Date.now()}.txt`; a.click();
   URL.revokeObjectURL(url);
+}
+
+function downloadPdf() {
+  const d = getDocContent(); if (!d) return;
+  if (typeof window.jspdf === 'undefined') { toast('PDF library loading, try again in a moment'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const margin = 18, pageW = 210, maxW = pageW - margin*2;
+  let y = 20;
+
+  function addText(text, size, bold, color) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setTextColor(...(color || [30,30,30]));
+    const lines = doc.splitTextToSize(String(text), maxW);
+    lines.forEach(line => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.text(line, margin, y);
+      y += size * 0.45;
+    });
+    y += 2;
+  }
+
+  addText('ClearPass — Declassified Message', 16, true, [30,30,30]);
+  addText(`Generated: ${d.ts}  |  Sensitivity: ${d.sensitivity}  |  ${d.items.length} items redacted`, 9, false, [120,120,120]);
+  y += 4;
+  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 6;
+
+  addText('READY TO SEND', 10, true, [61,186,126]);
+  addText(d.clean, 11, false);
+  y += 4;
+  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 6;
+
+  addText('TASK SUMMARY FOR TEAM', 10, true, [79,142,247]);
+  addText(d.summary, 11, false);
+  y += 4;
+  doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 6;
+
+  addText('REDACTION LOG', 10, true, [200,80,80]);
+  d.items.forEach(r => addText(`[${r.category}]  "${r.original}"  →  ${r.token}`, 10, false, [100,100,100]));
+
+  doc.save(`clearpass-${Date.now()}.pdf`);
+  toast('PDF downloaded');
+}
+
+function downloadWord() {
+  const d = getDocContent(); if (!d) return;
+  const redactionRows = d.items.map(r =>
+    `<tr><td style="padding:4px 8px;border:1px solid #ddd;color:#555;font-size:12px;">${r.category}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#c0392b;font-size:12px;">${r.original}</td><td style="padding:4px 8px;border:1px solid #ddd;color:#888;font-size:12px;">${r.token}</td></tr>`
+  ).join('');
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>ClearPass</title>
+<style>
+  body{font-family:Calibri,sans-serif;font-size:11pt;color:#1a1a1a;margin:2cm;}
+  h1{font-size:18pt;color:#1a1a1a;margin-bottom:4pt;}
+  h2{font-size:12pt;margin-top:18pt;margin-bottom:6pt;}
+  .meta{font-size:9pt;color:#888;margin-bottom:12pt;}
+  .section{background:#f8f9fa;border-left:4px solid #4f8ef7;padding:10pt 14pt;margin:10pt 0;font-size:11pt;line-height:1.6;}
+  .section-green{border-color:#3dba7e;}
+  .section-blue{border-color:#4f8ef7;}
+  table{border-collapse:collapse;width:100%;margin-top:8pt;}
+  th{background:#f0f0f0;padding:5pt 8pt;border:1px solid #ddd;font-size:9pt;text-align:left;}
+  hr{border:none;border-top:1px solid #ddd;margin:14pt 0;}
+</style></head>
+<body>
+<h1>ClearPass — Declassified Message</h1>
+<div class="meta">Generated: ${d.ts} &nbsp;|&nbsp; Sensitivity: ${d.sensitivity} &nbsp;|&nbsp; ${d.items.length} items redacted</div>
+<hr>
+<h2 style="color:#3dba7e;">✅ Ready to Send</h2>
+<div class="section section-green">${d.clean.replace(/\n/g,'<br>')}</div>
+<h2 style="color:#4f8ef7;">Task Summary for Team</h2>
+<div class="section section-blue">${d.summary}</div>
+<h2>Full Annotated Message</h2>
+<div class="section">${escHtml(d.annotated).replace(/\[REDACTED:[^\]]*\]/g, m=>`<span style="background:#fdecea;color:#c0392b;padding:1px 4px;border-radius:3px;font-family:Courier New,monospace;font-size:9pt;">${m}</span>`).replace(/\n/g,'<br>')}</div>
+<h2>Redaction Log</h2>
+<table><thead><tr><th>Category</th><th>Original value</th><th>Replaced with</th></tr></thead><tbody>${redactionRows}</tbody></table>
+</body></html>`;
+
+  const blob = new Blob([html],{type:'application/msword'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`clearpass-${Date.now()}.doc`; a.click();
+  URL.revokeObjectURL(url);
+  toast('Word doc downloaded');
 }
 
 // ── HISTORY ──
 function saveHistory(d) {
-  const entry = {
-    id: Date.now(),
-    time: new Date().toLocaleString(),
-    preview: (d.declassified_message || '').slice(0, 80),
-    sensitivity: d.sensitivity_level,
-    count: (d.redacted_items || []).length,
-    data: d
-  };
-  history.unshift(entry);
-  if (history.length > 10) history.pop();
+  const entry = { id:Date.now(), time:new Date().toLocaleString(), preview:(d.declassified_message||'').slice(0,80), sensitivity:d.sensitivity_level, count:(d.redacted_items||[]).length, data:d };
+  history.unshift(entry); if (history.length>10) history.pop();
   localStorage.setItem('cp_history', JSON.stringify(history));
   renderHistory();
 }
-
 function loadHistory() {
-  try { history = JSON.parse(localStorage.getItem('cp_history') || '[]'); } catch { history = []; }
+  try { history = JSON.parse(localStorage.getItem('cp_history')||'[]'); } catch { history=[]; }
   renderHistory();
 }
-
-function clearHistory() {
-  history = [];
-  localStorage.removeItem('cp_history');
-  renderHistory();
-}
-
+function clearHistory() { history=[]; localStorage.removeItem('cp_history'); renderHistory(); }
 function renderHistory() {
   const sec = document.getElementById('history-section');
   const list = document.getElementById('history-list');
-  document.getElementById('history-count').textContent = history.length + ' processed';
-  if (!history.length) { sec.style.display = 'none'; return; }
-  sec.style.display = 'block';
-  const lvlCls = { low: 'status-low', medium: 'status-medium', high: 'status-high' };
-  list.innerHTML = history.map(h => `
+  document.getElementById('history-count').textContent = history.length+' processed';
+  if (!history.length) { sec.style.display='none'; return; }
+  sec.style.display='block';
+  const lvl = { low:'status-low', medium:'status-medium', high:'status-high' };
+  list.innerHTML = history.map(h=>`
     <div class="history-item" onclick="restoreHistory(${h.id})">
       <div class="history-item-top">
         <div class="history-meta">
-          <span class="history-badge status-badge ${lvlCls[h.sensitivity] || 'status-medium'}" style="font-size:11px; padding:2px 8px;">${h.sensitivity}</span>
+          <span class="history-badge status-badge ${lvl[h.sensitivity]||'status-medium'}" style="font-size:11px;padding:2px 8px;">${h.sensitivity}</span>
           <span class="history-badge" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border);font-size:11px;padding:2px 8px;">${h.count} redacted</span>
         </div>
         <span class="history-time">${h.time}</span>
       </div>
       <div class="history-preview">${escHtml(h.preview)}…</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
-
 function restoreHistory(id) {
-  const entry = history.find(h => h.id === id);
-  if (!entry) return;
-  currentOutput = entry.data;
-  renderOutput(entry.data);
+  const entry = history.find(h=>h.id===id); if (!entry) return;
+  currentOutput = entry.data; renderOutput(entry.data);
 }
 
-// ── UTILS ──
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2500);
+  const el = document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2500);
 }
+if (sessionStorage.getItem('cp_auth') === 'yes') showApp();
 </script>
 </body>
 </html>

@@ -369,36 +369,32 @@
 <div id="toast"></div>
 
 <script>
-// ── CREDENTIALS (change these) ──
-const USERS = {
-  'admin': 'clearpass2024',
-  'cofounder': 'secure123'
-};
-
-// ── LOGIN ──
-
-function doLogin() {
+// ── LOGIN (checked on the server) ──
+async function doLogin() {
   const u = document.getElementById('login-user').value.trim();
   const p = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
-  if (USERS[u] && USERS[u] === p) {
-    sessionStorage.setItem('cp_auth', 'yes');
-    sessionStorage.setItem('cp_user', u);
-    err.textContent = '';
+  err.textContent = '';
+  try {
+    const res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p }) });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) { err.textContent = (data.error && data.error.message) || 'Sign-in failed.'; document.getElementById('login-pass').value=''; return; }
     showApp();
-  } else {
-    err.textContent = 'Incorrect username or password.';
-    document.getElementById('login-pass').value = '';
-  }
+  } catch (e) { err.textContent = 'Could not reach the server. It may be waking up, so try again in a moment.'; }
 }
 
-function doLogout() {
-  sessionStorage.removeItem('cp_auth');
-  sessionStorage.removeItem('cp_user');
+async function doLogout() {
+  try { await fetch('/api/logout', { method:'POST' }); } catch (e) {}
   document.getElementById('app-screen').classList.remove('visible');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
+}
+
+function sessionExpired() {
+  document.getElementById('app-screen').classList.remove('visible');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-error').textContent = 'Your session ended. Please sign in again.';
 }
 
 function showApp() {
@@ -474,19 +470,18 @@ function handleImage(e) {
 async function runAgent() {
   const tags = getActiveTags();
   if (!tags.length) { toast('Select at least one redaction category'); return; }
-  let userContent = [];
+  const payload = { mode, tags: mode==='brief' ? [] : tags,
+    custom: document.getElementById('custom-rules').value.trim(),
+    context: document.getElementById('team-context').value.trim() };
   if (activeTab === 'text') {
     const msg = document.getElementById('msg-input').value.trim();
     if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }
     lastSource = msg;
-    userContent = [{ type:'text', text: buildTextPrompt(msg, tags) }];
+    payload.text = msg;
   } else {
     if (!imageBase64) { toast('Upload an image first'); return; }
     lastSource = '';
-    userContent = [
-      { type:'image', source:{ type:'base64', media_type: imageMediaType, data: imageBase64 } },
-      { type:'text', text: buildImagePrompt(tags) }
-    ];
+    payload.image = { media_type: imageMediaType, data: imageBase64 };
   }
   const btn = document.getElementById('run-btn');
   btn.disabled = true;
@@ -496,11 +491,7 @@ async function runAgent() {
     let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 120000); });
     const res = await Promise.race([timeout, fetch('/api/declassify', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6', max_tokens:4000,
-        system:`You are a confidential message declassification agent. Strip sensitive business information from client messages before sharing with technical employees. Return ONLY valid JSON. No markdown fences. No extra text.`,
-        messages:[{ role:'user', content: userContent }]
-      })
+      body: JSON.stringify(payload)
     })]);
     clearTimeout(timer);
     const rawText = await res.text();
@@ -513,9 +504,9 @@ async function runAgent() {
         : 'Unexpected reply from the server (status '+res.status+'): '+rawText.slice(0,120), 12000);
       return;
     }
-    if (data.error || !res.ok) { const m = data.error && (data.error.message || (typeof data.error==='string' ? data.error : JSON.stringify(data.error))); toast('API error ('+res.status+'): ' + (m || 'unknown'), 9000); return; }
-    const raw = data.content.map(i=>i.text||'').join('');
-    const parsed = JSON.parse(raw.replace(/^```json\s*|```\s*$/g,'').trim());
+    if (res.status === 401) { sessionExpired(); return; }
+    if (data.error || !res.ok) { const m = data.error && (data.error.message || (typeof data.error==='string' ? data.error : JSON.stringify(data.error))); toast(m || ('Server error ('+res.status+')'), 9000); return; }
+    const parsed = data.result;
     parsed._mode = mode;
     if (!parsed.declassified_message && lastSource) {
       let t = lastSource;
@@ -530,85 +521,6 @@ async function runAgent() {
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="run-btn-label">' + (mode==='brief' ? 'Create freelancer brief' : 'Declassify message') + '</span>';
   }
-}
-
-const BRIEF_RULES = `You are preparing a task brief for a freelancer who works for an agency. The freelancer must NOT be able to work out who the end client is, and must not be able to find the original job on Upwork.
-REMOVE completely: client name, company/brand/product name, the exact job title, the client's budget, rates and payment terms, links, URLs, usernames and emails, and the client's country, city and time zone.
-ALSO REMOVE or generalize indirect clues that could be searched for: combinations such as industry + city + company size + funding stage, distinctive product descriptions, named competitors, named integrations that only this client uses, and unusual deadlines tied to a public event. Replace these with generic wording (for example "a B2B SaaS product" or "an early-stage startup").
-KEEP everything the freelancer needs to do the work: the actual tasks, deliverables, technologies and versions, platforms, functional requirements, acceptance criteria and general priorities.
-Do not invent requirements. If something important is missing, list it under questions to clarify.`;
-
-const BRIEF_SCHEMA = `Return ONLY this JSON (no markdown):
-{
-  "clean_message": "the finished brief as plain text, ready to paste into a chat. RULES: (1) Do NOT write a title or heading line. Begin directly with the word Overview. (2) Use these section headers, each followed by its content, with a blank line between sections and '- ' for bullets: Overview, Scope of work, Tech and skills. (3) Write the Overview in a neutral, impersonal voice that says what work is needed, for example 'Engineer needed to support electronics production at factories in China, from process setup through to mass production quality control.' Never say that a company, startup, client or team is looking for or hiring someone, and never use we, our, or the client. (4) Add a Deliverables or Acceptance criteria section ONLY if the source text states them. Otherwise leave those sections out completely. (5) Never invent anything that is not in the source: no timelines, sign-off terms, rates, tools or cultural notes. Stay faithful to the source wording. (6) Do not include any questions in this text. No markdown symbols and no client identifying details.",
-  "redacted_items": [{"category": "client_name|company|budget|job_title|links|location|indirect_clue|other", "original": "the exact text removed or generalized", "token": "[REDACTED: CATEGORY]"}],
-  "summary_for_team": "one sentence describing the task with zero identifying details",
-  "residual_risks": ["short notes on anything left in the brief that could still help someone identify the client, for example a very specific product feature. Use an empty array if you see none."],
-  "questions_for_client": ["important details missing from the source that the user should ask their own client before assigning the work, for example the expected weekly time commitment or the product types in scope. Use an empty array if nothing important is missing."],
-  "sensitivity_level": "low|medium|high",
-  "redact_count": 3
-}`;
-
-function buildTextPrompt(msg, tags) {
-  if (mode === 'brief') {
-    const custom = document.getElementById('custom-rules').value.trim();
-    const ctx = document.getElementById('team-context').value.trim();
-    return `${BRIEF_RULES}${custom?'\nAlso remove: '+custom:''}
-${ctx?'Context about the freelancer or team: '+ctx:''}
-
-Upwork job post:
-"""
-${msg}
-"""
-
-${BRIEF_SCHEMA}`;
-  }
-  const custom = document.getElementById('custom-rules').value.trim();
-  const ctx = document.getElementById('team-context').value.trim();
-  return `Declassify this client message. Redact: ${tags.join(', ')}${custom?'\nAlso redact: '+custom:''}.
-${ctx?'Team context: '+ctx:''}
-
-Client message:
-"""
-${msg}
-"""
-
-Return ONLY this JSON (no markdown):
-{
-  "declassified_message": "full message with sensitive parts replaced by [REDACTED: CATEGORY] tokens",
-  "clean_message": "same message but completely remove every [REDACTED: CATEGORY] token and any surrounding punctuation or words that no longer make sense without it, so the message reads naturally and fluently with nothing missing or awkward. For example 'Hey [REDACTED: CLIENT_NAME],' becomes just 'Hey,' and 'budget is [REDACTED: BUDGET]' becomes just remove that clause entirely.",
-  "redacted_items": [{"category": "client_name|budget|etc", "original": "actual text found", "token": "[REDACTED: CATEGORY]"}],
-  "summary_for_team": "1-2 sentence plain task summary with zero sensitive information",
-  "sensitivity_level": "low|medium|high",
-  "redact_count": 3
-}`;
-}
-
-function buildImagePrompt(tags) {
-  if (mode === 'brief') {
-    const custom = document.getElementById('custom-rules').value.trim();
-    const ctx = document.getElementById('team-context').value.trim();
-    return `Read all the text in this screenshot of an Upwork job post, then turn it into a freelancer brief.
-${BRIEF_RULES}${custom?'\nAlso remove: '+custom:''}
-${ctx?'Context about the freelancer or team: '+ctx:''}
-
-${BRIEF_SCHEMA}`;
-  }
-  const custom = document.getElementById('custom-rules').value.trim();
-  const ctx = document.getElementById('team-context').value.trim();
-  return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${custom?'\nAlso redact: '+custom:''}.
-${ctx?'Team context: '+ctx:''}
-
-Return ONLY this JSON (no markdown):
-{
-  "extracted_text": "all text from the image verbatim",
-  "declassified_message": "same text but sensitive parts replaced by [REDACTED: CATEGORY] tokens",
-  "clean_message": "same message but completely remove every [REDACTED: CATEGORY] token and any surrounding punctuation or words that no longer make sense without it, so the message reads naturally and fluently. For example 'Hey [REDACTED: CLIENT_NAME],' becomes just 'Hey,' and 'budget is [REDACTED: BUDGET]' becomes remove that clause entirely.",
-  "redacted_items": [{"category": "client_name|budget|etc", "original": "actual text", "token": "[REDACTED: CATEGORY]"}],
-  "summary_for_team": "1-2 sentence plain task summary with zero sensitive information",
-  "sensitivity_level": "low|medium|high",
-  "redact_count": 3
-}`;
 }
 
 // ── RENDER ──
@@ -774,7 +686,7 @@ function toast(msg, ms) {
   const el = document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'), ms||2500);
 }
-if (sessionStorage.getItem('cp_auth') === 'yes') showApp();
+fetch('/api/me').then(r=>{ if (r.ok) showApp(); }).catch(()=>{});
 </script>
 </body>
 </html>

@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ClearPass — Message Declassifier</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
@@ -223,6 +224,23 @@
   .strict-row{display:flex;gap:10px;align-items:flex-start;margin-top:1rem;font-size:13px;color:var(--text2);cursor:pointer;line-height:1.5}
   .strict-row input{margin-top:3px;accent-color:var(--accent)}
   .strict-row b{color:var(--text)}
+
+
+  .auth-link{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-family:var(--sans);margin-top:10px;display:block;width:100%}
+  .auth-info{font-size:13px;color:var(--green);margin-top:.75rem;min-height:0}
+  .overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:1rem}
+  .overlay.open{display:flex}
+  #team-screen{background:var(--bg);z-index:950}
+  .panel{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.5rem;width:100%;max-width:520px;max-height:90vh;overflow:auto}
+  .panel h3{font-size:17px;margin-bottom:4px}
+  .panel .sub{font-size:13px;color:var(--text2);margin-bottom:1rem}
+  .panel input[type=text]{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-family:var(--sans);font-size:14px;margin-bottom:8px}
+  .two-up{display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:760px;width:100%}
+  @media (max-width:700px){.two-up{grid-template-columns:1fr}}
+  .member-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .member-row span{color:var(--text2);font-size:12px}
+  .code-box{font-family:var(--mono);font-size:18px;letter-spacing:.12em;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:inline-block}
+  .sec-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:1.1rem 0 6px}
 </style>
 </head>
 <body>
@@ -234,18 +252,21 @@
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     </div>
     <h2>ClearPass</h2>
-    <p>Sign in to access the declassifier</p>
+    <p id="login-sub">Sign in to access the declassifier</p>
     <div class="login-field">
-      <label>Username</label>
+      <label id="login-user-label">Username</label>
       <input type="text" id="login-user" placeholder="Enter username" autocomplete="username" />
     </div>
     <div class="login-field">
       <label>Password</label>
       <input type="password" id="login-pass" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" />
     </div>
-    <button class="login-btn" onclick="doLogin()">Sign in</button>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign in</button>
     <div class="login-error" id="login-error"></div>
-    <div class="login-hint">Contact your admin for credentials</div>
+    <div class="auth-info" id="login-info"></div>
+    <button class="auth-link" id="auth-toggle" style="display:none" onclick="authToggle()"></button>
+    <button class="auth-link" id="auth-forgot" style="display:none" onclick="authForgot()">Forgot your password?</button>
+    <div class="login-hint" id="login-hint">Contact your admin for credentials</div>
   </div>
 </div>
 
@@ -259,6 +280,7 @@
   </a>
   <div class="nav-right">
     <div class="api-indicator"><div class="dot"></div> Claude API</div>
+    <button class="nav-btn" id="team-btn" style="display:none" onclick="openTeam()">Team</button>
     <div class="nav-pill" id="history-count">0 processed</div>
     <button class="logout-btn" onclick="doLogout()">Sign out</button>
   </div>
@@ -318,8 +340,8 @@
     </div>
     <div class="vault-row">
       <select id="vault-select" onchange="vaultSelect()"></select>
-      <button class="vault-btn" onclick="vaultEdit(false)">Edit</button>
-      <button class="vault-btn" onclick="vaultEdit(true)">+ New client</button>
+      <button class="vault-btn" id="vault-edit-btn" onclick="vaultEdit(false)">Edit</button>
+      <button class="vault-btn" id="vault-new-btn" onclick="vaultEdit(true)">+ New client</button>
     </div>
     <div class="vault-editor" id="vault-editor">
       <input id="vault-name" placeholder="Label for you only, e.g. Acme project" maxlength="60" />
@@ -330,7 +352,7 @@
         <button class="vault-btn" onclick="vaultClose()">Cancel</button>
       </div>
     </div>
-    <div class="vault-note">Pick a client and every run removes their saved names and details, even if the AI misses one. Saved only in this browser, never on our server. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></div>
+    <div class="vault-note" id="vault-note">Pick a client and every run removes their saved names and details, even if the AI misses one. <span id="vault-local-note">Saved only in this browser, never on our server. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></span></div>
   </div>
 
   <div class="card">
@@ -419,6 +441,7 @@
   </div>
 
 
+
   <div class="card" id="reply-card" style="margin-top:1rem">
     <div class="card-title">
       <svg viewBox="0 0 24 24"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
@@ -454,35 +477,226 @@
 <footer>ClearPass — built with Claude AI &nbsp;·&nbsp; <a href="https://docs.anthropic.com" target="_blank">Anthropic docs</a></footer>
 </div>
 
+
+<div class="overlay" id="team-screen">
+  <div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:1rem">
+    <div style="text-align:center"><h2 style="font-size:22px">Set up your team</h2><div style="color:var(--text2);font-size:14px;margin-top:4px" id="team-welcome"></div></div>
+    <div class="two-up">
+      <div class="panel"><h3>Create a team</h3><div class="sub">You become the owner. You manage clients and company rules, and invite your staff.</div>
+        <input type="text" id="team-create-name" placeholder="Team or company name" maxlength="80" />
+        <button class="login-btn" style="margin-top:0" onclick="teamCreate()">Create team</button></div>
+      <div class="panel"><h3>Join a team</h3><div class="sub">Got an invite code from your team owner? Enter it here.</div>
+        <input type="text" id="team-join-code" placeholder="Invite code" maxlength="20" style="text-transform:uppercase" />
+        <button class="login-btn" style="margin-top:0" onclick="teamJoin()">Join team</button></div>
+    </div>
+    <div class="login-error" id="team-error"></div>
+    <button class="auth-link" style="width:auto" onclick="doLogout()">Sign out</button>
+  </div>
+</div>
+
+<div class="overlay" id="team-modal" onclick="if(event.target===this)closeTeam()">
+  <div class="panel" id="team-panel"></div>
+</div>
+
+<div class="overlay" id="recovery-modal">
+  <div class="panel" style="max-width:380px"><h3>Choose a new password</h3><div class="sub">At least 8 characters.</div>
+    <input type="password" id="recovery-pass" placeholder="New password" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-family:var(--sans);font-size:14px;margin-bottom:8px" />
+    <button class="login-btn" style="margin-top:0" onclick="recoverySave()">Save password</button>
+    <div class="login-error" id="recovery-error"></div></div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-// ── LOGIN (checked on the server) ──
+// ── AUTH ──
+let SB = null, teamMode = false, TEAM = null, authMode = 'in';
+
+async function api(path, opts) {
+  opts = opts || {}; const headers = Object.assign({}, opts.headers || {});
+  if (teamMode) {
+    const { data } = await SB.auth.getSession();
+    if (data && data.session) headers.Authorization = 'Bearer ' + data.session.access_token;
+  }
+  return fetch(path, Object.assign({}, opts, { headers }));
+}
+const jsonHdr = { 'Content-Type': 'application/json' };
+
+function friendlyAuthError(m) {
+  m = String(m || '');
+  if (/invalid login/i.test(m)) return 'Incorrect email or password.';
+  if (/not confirmed/i.test(m)) return 'Please confirm your email first. Check your inbox for the link.';
+  if (/already registered|already been registered/i.test(m)) return 'That email already has an account. Try signing in.';
+  if (/rate limit|too many/i.test(m)) return 'Too many attempts. Please wait a few minutes and try again.';
+  if (/password/i.test(m) && /(short|least|weak)/i.test(m)) return 'Choose a longer password (at least 8 characters).';
+  return m || 'Something went wrong. Please try again.';
+}
+
+function authRender() {
+  if (!teamMode) return;
+  const up = authMode === 'up';
+  document.getElementById('login-sub').textContent = up ? 'Create your account' : 'Sign in to your account';
+  document.getElementById('login-btn').textContent = up ? 'Create account' : 'Sign in';
+  document.getElementById('auth-toggle').textContent = up ? 'Already have an account? Sign in' : 'New here? Create an account';
+  document.getElementById('auth-forgot').style.display = up ? 'none' : 'block';
+  document.getElementById('login-pass').autocomplete = up ? 'new-password' : 'current-password';
+  document.getElementById('login-error').textContent = ''; document.getElementById('login-info').textContent = '';
+}
+function authToggle() { authMode = authMode === 'in' ? 'up' : 'in'; authRender(); }
+
+async function authForgot() {
+  const email = document.getElementById('login-user').value.trim();
+  const err = document.getElementById('login-error'), info = document.getElementById('login-info');
+  err.textContent = ''; info.textContent = '';
+  if (!email) { err.textContent = 'Type your email above first.'; return; }
+  const { error } = await SB.auth.resetPasswordForEmail(email, { redirectTo: location.origin });
+  if (error) { err.textContent = friendlyAuthError(error.message); return; }
+  info.textContent = 'If that email has an account, a reset link is on its way.';
+}
+
 async function doLogin() {
   const u = document.getElementById('login-user').value.trim();
   const p = document.getElementById('login-pass').value;
-  const err = document.getElementById('login-error');
-  err.textContent = '';
+  const err = document.getElementById('login-error'), info = document.getElementById('login-info');
+  err.textContent = ''; info.textContent = '';
+  const btn = document.getElementById('login-btn'); btn.disabled = true;
   try {
-    const res = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p }) });
+    if (teamMode) {
+      if (!u || !p) { err.textContent = 'Enter your email and password.'; return; }
+      if (authMode === 'up') {
+        if (p.length < 8) { err.textContent = 'Choose a password of at least 8 characters.'; return; }
+        const { data, error } = await SB.auth.signUp({ email: u, password: p, options: { emailRedirectTo: location.origin } });
+        if (error) { err.textContent = friendlyAuthError(error.message); return; }
+        if (data.session) { await enterApp(); return; }
+        info.textContent = 'Almost done. Check your email and click the confirmation link, then sign in.';
+        authMode = 'in'; authRender(); info.textContent = 'Almost done. Check your email and click the confirmation link, then sign in.';
+        return;
+      }
+      const { error } = await SB.auth.signInWithPassword({ email: u, password: p });
+      if (error) { err.textContent = friendlyAuthError(error.message); document.getElementById('login-pass').value = ''; return; }
+      await enterApp();
+      return;
+    }
+    const res = await fetch('/api/login', { method:'POST', headers:jsonHdr, body: JSON.stringify({ username:u, password:p }) });
     const data = await res.json().catch(()=>({}));
     if (!res.ok) { err.textContent = (data.error && data.error.message) || 'Sign-in failed.'; document.getElementById('login-pass').value=''; return; }
     showApp();
   } catch (e) { err.textContent = 'Could not reach the server. It may be waking up, so try again in a moment.'; }
+  finally { btn.disabled = false; }
 }
 
 async function doLogout() {
-  try { await fetch('/api/logout', { method:'POST' }); } catch (e) {}
+  if (teamMode) { try { await SB.auth.signOut(); } catch (e) {} TEAM = null; }
+  else { try { await fetch('/api/logout', { method:'POST' }); } catch (e) {} }
   document.getElementById('app-screen').classList.remove('visible');
+  document.getElementById('team-screen').classList.remove('open');
+  document.getElementById('team-modal').classList.remove('open');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').textContent = '';
 }
 
 function sessionExpired() {
+  if (teamMode) { try { SB.auth.signOut(); } catch (e) {} TEAM = null; }
   document.getElementById('app-screen').classList.remove('visible');
+  document.getElementById('team-screen').classList.remove('open');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-error').textContent = 'Your session ended. Please sign in again.';
+}
+
+async function enterApp() {
+  const res = await api('/api/team');
+  if (res.status === 401) { sessionExpired(); return; }
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) { document.getElementById('login-error').textContent = (data.error && data.error.message) || 'Could not load your account.'; return; }
+  TEAM = data.team;
+  document.getElementById('login-screen').classList.add('hidden');
+  if (!TEAM) {
+    document.getElementById('team-welcome').textContent = 'Signed in as ' + (data.user && data.user.email || '');
+    document.getElementById('team-screen').classList.add('open');
+    return;
+  }
+  document.getElementById('team-screen').classList.remove('open');
+  showApp();
+}
+async function reloadTeam() { const r = await api('/api/team'); if (r.ok) { TEAM = (await r.json()).team; if (TEAM) { vault = TEAM.clients || []; vaultRender(); } } }
+
+async function teamCreate() {
+  const err = document.getElementById('team-error'); err.textContent = '';
+  const r = await api('/api/team/create', { method:'POST', headers:jsonHdr, body: JSON.stringify({ name: document.getElementById('team-create-name').value }) });
+  const d = await r.json().catch(()=>({})); if (!r.ok) { err.textContent = (d.error && d.error.message) || 'Could not create the team.'; return; }
+  await enterApp();
+}
+async function teamJoin() {
+  const err = document.getElementById('team-error'); err.textContent = '';
+  const r = await api('/api/team/join', { method:'POST', headers:jsonHdr, body: JSON.stringify({ code: document.getElementById('team-join-code').value }) });
+  const d = await r.json().catch(()=>({})); if (!r.ok) { err.textContent = (d.error && d.error.message) || 'That code did not work.'; return; }
+  await enterApp();
+}
+
+// Team panel
+async function openTeam() { renderTeam(); document.getElementById('team-modal').classList.add('open'); try { await reloadTeam(); const ta = document.getElementById('team-rules'); if (!ta || ta.value === ta.defaultValue) renderTeam(); } catch (e) {} }
+function closeTeam() { document.getElementById('team-modal').classList.remove('open'); }
+function renderTeam() {
+  if (!TEAM) return;
+  const owner = TEAM.role === 'owner';
+  const members = (TEAM.members||[]).map(m => `<div class="member-row"><div>${escHtml(m.email||'Unknown')} <span>${m.role==='owner'?'Owner':'Member'}</span></div>${owner && m.role==='member' ? `<button class="vault-btn danger" onclick="teamRemove('${escHtml(m.user_id)}')">Remove</button>` : ''}</div>`).join('');
+  document.getElementById('team-panel').innerHTML = `
+    <h3>${escHtml(TEAM.name)}</h3><div class="sub">You are the ${owner?'owner':'a member'} of this team.</div>
+    <div class="sec-label">People</div>${members}
+    ${owner ? `<div class="sec-label">Invite code</div><div><span class="code-box" id="inv-code">${escHtml(TEAM.inviteCode||'—')}</span>
+      <button class="vault-btn" style="margin-left:8px" onclick="teamNewCode()">New code</button></div>
+      <div class="vault-note">Share this code with your staff. They create an account, then choose Join a team. Make a new code to stop the old one working.</div>` : ''}
+    <div class="sec-label">Company rules</div>
+    <div class="vault-note" style="margin:0 0 6px">Applied to every run by everyone on the team, for example "Never include our pricing or margins."</div>
+    ${owner ? `<textarea id="team-rules" maxlength="2000" style="min-height:90px">${escHtml(TEAM.rules||'')}</textarea>
+      <div style="margin-top:8px"><button class="vault-btn" onclick="teamSaveRules()">Save rules</button></div>`
+      : `<div class="message-box" style="min-height:0">${TEAM.rules ? escHtml(TEAM.rules) : '<i style="color:var(--text3)">None set.</i>'}</div>`}
+    <div style="display:flex;justify-content:space-between;margin-top:1.25rem"><button class="vault-btn" onclick="doLogout()">Sign out</button><button class="vault-btn" onclick="closeTeam()">Close</button></div>`;
+}
+async function teamSaveRules() {
+  const r = await api('/api/team/rules', { method:'POST', headers:jsonHdr, body: JSON.stringify({ rules: document.getElementById('team-rules').value }) });
+  const d = await r.json().catch(()=>({})); if (!r.ok) { toast((d.error && d.error.message) || 'Could not save', 6000); return; }
+  TEAM.rules = document.getElementById('team-rules').value; toast('Rules saved');
+}
+async function teamNewCode() {
+  if (!confirm('Make a new invite code? The old one will stop working.')) return;
+  const r = await api('/api/team/invite-code', { method:'POST' }); const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast((d.error && d.error.message) || 'Could not make a code', 6000); return; }
+  TEAM.inviteCode = d.inviteCode; renderTeam();
+}
+async function teamRemove(uid) {
+  if (!confirm('Remove this person from the team?')) return;
+  const r = await api('/api/team/members/' + encodeURIComponent(uid), { method:'DELETE' }); const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast((d.error && d.error.message) || 'Could not remove', 6000); return; }
+  await reloadTeam(); renderTeam();
+}
+
+async function recoverySave() {
+  const p = document.getElementById('recovery-pass').value, err = document.getElementById('recovery-error');
+  if (p.length < 8) { err.textContent = 'Use at least 8 characters.'; return; }
+  const { error } = await SB.auth.updateUser({ password: p });
+  if (error) { err.textContent = friendlyAuthError(error.message); return; }
+  document.getElementById('recovery-modal').classList.remove('open'); toast('Password updated'); await enterApp();
+}
+
+async function initAuth() {
+  let cfg = { mode: 'legacy' };
+  try { cfg = await (await fetch('/api/config')).json(); } catch (e) {}
+  if (cfg.mode === 'supabase' && window.supabase) {
+    teamMode = true;
+    SB = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+    document.getElementById('login-user-label').textContent = 'Email';
+    const u = document.getElementById('login-user'); u.type = 'email'; u.placeholder = 'you@company.com'; u.autocomplete = 'email';
+    document.getElementById('auth-toggle').style.display = 'block';
+    document.getElementById('login-hint').textContent = '';
+    authRender();
+    SB.auth.onAuthStateChange(ev => { if (ev === 'PASSWORD_RECOVERY') document.getElementById('recovery-modal').classList.add('open'); });
+    const { data } = await SB.auth.getSession();
+    if (data && data.session) await enterApp();
+    return;
+  }
+  fetch('/api/me').then(r=>{ if (r.ok) showApp(); }).catch(()=>{});
 }
 
 function showApp() {
@@ -491,7 +705,18 @@ function showApp() {
   renderTags();
   loadHistory();
   vaultLoad();
+  applyTeamUi();
   try { document.getElementById('strict-on').checked = localStorage.getItem('cp_strict')==='1'; } catch(e) {}
+}
+
+function applyTeamUi() {
+  document.getElementById('team-btn').style.display = teamMode ? '' : 'none';
+  if (!teamMode) return;
+  const owner = TEAM && TEAM.role === 'owner';
+  document.getElementById('vault-edit-btn').style.display = owner ? '' : 'none';
+  document.getElementById('vault-new-btn').style.display = owner ? '' : 'none';
+  document.getElementById('vault-local-note').style.display = 'none';
+  document.getElementById('vault-note').firstChild.textContent = 'Pick a client and every run removes their saved names and details, even if the AI misses one. Shared with your team' + (owner ? '. You manage this list.' : '. Your team owner manages this list.') + ' ';
 }
 
 // ── STATE ──
@@ -560,15 +785,16 @@ function handleImage(e) {
 
 // ── CLIENT VAULT (stored only in this browser) ──
 let vault = []; let vaultEditing = null;
-function vaultLoad() { try { vault = JSON.parse(localStorage.getItem('cp_clients')||'[]'); if (!Array.isArray(vault)) vault = []; } catch(e) { vault = []; } vaultRender(); }
+function vaultLoad() { if (teamMode) { vault = (TEAM && TEAM.clients) || []; vaultRender(); return; } try { vault = JSON.parse(localStorage.getItem('cp_clients')||'[]'); if (!Array.isArray(vault)) vault = []; } catch(e) { vault = []; } vaultRender(); }
 function vaultPersist() { try { localStorage.setItem('cp_clients', JSON.stringify(vault)); } catch(e) { toast('Could not save in this browser'); } }
 function vaultRender() {
   const sel = document.getElementById('vault-select'); const cur = sel.value;
-  sel.innerHTML = '<option value="">No saved client</option>' + vault.map(c=>`<option value="${escHtml(c.id)}">${escHtml(c.name)} (${c.terms.length} terms)</option>`).join('');
+  sel.innerHTML = '<option value="">No saved client</option>' + vault.map(c=>`<option value="${escHtml(c.id)}">${escHtml(c.name||c.label)} (${c.terms.length} terms)</option>`).join('');
   if (vault.some(c=>c.id===cur)) sel.value = cur;
 }
 function vaultSelect() { /* selection is read at run time */ }
 function vaultTerms() {
+  if (teamMode) return [];
   const c = vault.find(c=>c.id===document.getElementById('vault-select').value);
   return c ? c.terms : [];
 }
@@ -577,24 +803,31 @@ function vaultEdit(isNew) {
   const c = isNew ? null : vault.find(c=>c.id===sel.value);
   if (!isNew && !c) { toast('Pick a client to edit, or choose + New client'); return; }
   vaultEditing = c ? c.id : null;
-  document.getElementById('vault-name').value = c ? c.name : '';
+  document.getElementById('vault-name').value = c ? (c.name||c.label) : '';
   document.getElementById('vault-terms').value = c ? c.terms.join('\n') : '';
   document.getElementById('vault-del').style.display = c ? 'inline-block' : 'none';
   document.getElementById('vault-editor').style.display = 'block';
 }
 function vaultClose() { document.getElementById('vault-editor').style.display = 'none'; vaultEditing = null; }
-function vaultSave() {
+async function vaultSave() {
   const name = document.getElementById('vault-name').value.trim();
   const terms = [...new Set(document.getElementById('vault-terms').value.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>s.slice(0,100)))].slice(0,60);
   if (!name) { toast('Give the client a label'); return; }
   if (!terms.length) { toast('Add at least one name or detail to hide'); return; }
+  if (teamMode) {
+    const r = await api(vaultEditing ? '/api/clients/' + encodeURIComponent(vaultEditing) : '/api/clients', { method: vaultEditing ? 'PUT' : 'POST', headers: jsonHdr, body: JSON.stringify({ label: name, terms }) });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast((d.error && d.error.message) || 'Could not save the client', 7000); return; }
+    await reloadTeam(); if (d.client) document.getElementById('vault-select').value = d.client.id; vaultClose(); toast('Client saved'); return;
+  }
   let id = vaultEditing;
   if (id) { const c = vault.find(c=>c.id===id); c.name = name; c.terms = terms; }
   else { id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); vault.push({ id, name, terms }); }
   vaultPersist(); vaultRender(); document.getElementById('vault-select').value = id; vaultClose(); toast('Client saved');
 }
-function vaultDelete() {
+async function vaultDelete() {
   if (!vaultEditing || !confirm('Delete this client from the vault?')) return;
+  if (teamMode) { const r = await api('/api/clients/' + encodeURIComponent(vaultEditing), { method:'DELETE' }); if (!r.ok) { toast('Could not delete', 6000); return; } await reloadTeam(); vaultClose(); return; }
   vault = vault.filter(c=>c.id!==vaultEditing); vaultPersist(); vaultRender(); vaultClose();
 }
 function vaultBackup() {
@@ -619,7 +852,7 @@ async function runReply() {
   const btn = document.getElementById('reply-btn'); btn.disabled = true; btn.textContent = 'Drafting…';
   try {
     let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 90000); });
-    const res = await Promise.race([timeout, fetch('/api/declassify', { method:'POST', headers:{'Content-Type':'application/json'},
+    const res = await Promise.race([timeout, api('/api/declassify', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ mode:'reply', text, clientName: document.getElementById('reply-name').value.trim(), tone: document.getElementById('reply-tone').value, context: document.getElementById('team-context').value.trim(), clientTerms: vaultTerms() }) })]);
     clearTimeout(timer);
     const raw = await res.text(); let data;
@@ -643,7 +876,7 @@ async function runAgent() {
   const payload = { mode, tags: mode==='brief' ? [] : tags,
     custom: document.getElementById('custom-rules').value.trim(),
     context: document.getElementById('team-context').value.trim(),
-    clientTerms: vaultTerms(), strict: mode==='msg' && document.getElementById('strict-on').checked };
+    clientTerms: vaultTerms(), clientId: teamMode ? document.getElementById('vault-select').value : '', strict: mode==='msg' && document.getElementById('strict-on').checked };
   if (activeTab === 'text') {
     const msg = document.getElementById('msg-input').value.trim();
     if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }
@@ -660,7 +893,7 @@ async function runAgent() {
   document.getElementById('output-wrap').classList.remove('show');
   try {
     let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 120000); });
-    const res = await Promise.race([timeout, fetch('/api/declassify', {
+    const res = await Promise.race([timeout, api('/api/declassify', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     })]);
@@ -860,7 +1093,7 @@ function toast(msg, ms) {
   const el = document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'), ms||2500);
 }
-fetch('/api/me').then(r=>{ if (r.ok) showApp(); }).catch(()=>{});
+initAuth();
 </script>
 </body>
 </html>

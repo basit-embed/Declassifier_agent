@@ -15,6 +15,11 @@ const tidy = v => String(v || '').trim().replace(/^["']|["']$/g, '').trim();
 
 const ANTHROPIC_API_KEY = tidy(process.env.ANTHROPIC_API_KEY);
 
+// Supabase (public values only; no secret keys are needed)
+const SB_URL = tidy(process.env.SUPABASE_URL).replace(/\/+$/, '');
+const SB_KEY = tidy(process.env.SUPABASE_ANON_KEY);
+const SB_ON = !!(SB_URL && SB_KEY);
+
 // Login accounts, set in Render as:  APP_USERS = name:password,name2:password2
 const USERS = new Map();
 String(process.env.APP_USERS || '').split(',').forEach(entry => {
@@ -99,11 +104,66 @@ function clearSession(req, res) {
 }
 function fail(res, status, message, extra) { return res.status(status).json({ error: { message }, ...(extra || {}) }); }
 
-function requireAuth(req, res, next) {
+const isUuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+const tokenCache = new Map();
+
+async function sb(path, token, opts = {}) {
+  const r = await fetch(SB_URL + path, {
+    method: opts.method || 'GET',
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.prefer ? { Prefer: opts.prefer } : {}) },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    signal: AbortSignal.timeout(20000),
+  });
+  const text = await r.text();
+  let data = null; try { data = text ? JSON.parse(text) : null; } catch { /* ignore */ }
+  return { ok: r.ok, status: r.status, data };
+}
+const sbMsg = (r, dflt) => (r.data && (r.data.message || r.data.msg || r.data.error_description)) || dflt;
+
+async function requireAuth(req, res, next) {
+  if (SB_ON) {
+    const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+    if (!m) return fail(res, 401, 'Please sign in.');
+    const tok = m[1].trim();
+    const hit = tokenCache.get(tok);
+    if (hit && hit.exp > Date.now()) { req.user = hit.id; req.email = hit.email; req.token = tok; return next(); }
+    try {
+      const r = await fetch(SB_URL + '/auth/v1/user', { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + tok }, signal: AbortSignal.timeout(15000) });
+      if (r.ok) {
+        const u = await r.json();
+        if (u && isUuid(u.id)) {
+          if (tokenCache.size > 500) tokenCache.clear();
+          tokenCache.set(tok, { id: u.id, email: u.email || '', exp: Date.now() + 60000 });
+          req.user = u.id; req.email = u.email || ''; req.token = tok;
+          return next();
+        }
+      }
+    } catch (e) { return fail(res, 503, 'Could not reach the sign-in service. Try again in a moment.'); }
+    return fail(res, 401, 'Please sign in.');
+  }
   const p = verify(readCookie(req, 'cp_session'));
   if (!p || !USERS.has(p.u)) return fail(res, 401, 'Please sign in.');
   req.user = p.u;
   next();
+}
+
+// Team data, read with the user's own token (Supabase row-level security decides what is visible)
+async function loadTeam(token, uid, full) {
+  const m = await sb(`/rest/v1/members?select=role,team:teams(id,name,rules)&user_id=eq.${uid}&limit=1`, token);
+  if (!m.ok) throw new Error(sbMsg(m, 'Could not load your team'));
+  const row = m.data && m.data[0];
+  if (!row || !row.team) return null;
+  const t = { id: row.team.id, name: row.team.name, rules: row.team.rules || '', role: row.role };
+  if (!full) return t;
+  const [cl, mem, sec] = await Promise.all([
+    sb(`/rest/v1/clients?select=id,label,terms&team_id=eq.${t.id}&order=created_at.asc`, token),
+    sb(`/rest/v1/members?select=user_id,email,role&team_id=eq.${t.id}&order=created_at.asc`, token),
+    t.role === 'owner' ? sb(`/rest/v1/team_secrets?select=invite_code&team_id=eq.${t.id}`, token) : Promise.resolve(null),
+  ]);
+  t.clients = cl.ok ? cl.data : [];
+  t.members = mem.ok ? mem.data : [];
+  if (sec && sec.ok && sec.data && sec.data[0]) t.inviteCode = sec.data[0].invite_code;
+  return t;
 }
 
 // ───────────────────────── prompts (kept on the server) ─────────────────────────
@@ -158,7 +218,11 @@ const REPLY_RULES = `You are helping the owner of an agency write to their clien
 Below is a message from the subcontractor. Write the message the agency owner should send to the client, in the first person plural ("we", "our team"), as if the agency's own team did the work.
 RULES: (1) Never mention a freelancer, subcontractor, contractor, outsourcing or the subcontractor's name, location or platform. (2) Keep every fact, number, date and technical detail that the client needs, and invent nothing: no promises, deadlines, prices or results that are not in the subcontractor's message. (3) Turn the subcontractor's questions into clear questions for the client. (4) Turn a status update into a short, confident progress update. (5) Match the requested tone. (6) Plain text only, no markdown, no subject line, no sign-off name. (7) Keep it short and natural, like a real message between professionals.`;
 
-function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict }) {
+function rulesLine(rules) {
+  return rules ? '\nCOMPANY RULES set by the account owner. Always follow these in addition to everything above: ' + rules : '';
+}
+
+function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict, rules }) {
   if (mode === 'reply') {
     return `${REPLY_RULES}
 Tone: ${tone}.
@@ -178,18 +242,18 @@ Return ONLY this JSON (no markdown):
       ? 'Read all the text in this screenshot of an Upwork job post, then turn it into a freelancer brief.\n'
       : '';
     const body = hasImage ? '' : `\n\nUpwork job post:\n"""\n${text}\n"""`;
-    return `${head}${BRIEF_RULES}${termsLine(terms)}${custom ? '\nAlso remove: ' + custom : ''}
+    return `${head}${BRIEF_RULES}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso remove: ' + custom : ''}
 ${context ? 'Context about the freelancer or team: ' + context : ''}${body}
 
 ${BRIEF_SCHEMA}`;
   }
   if (hasImage) {
-    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
+    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 ${MSG_SCHEMA_IMAGE}`;
   }
-  return `Declassify this client message. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${custom ? '\nAlso redact: ' + custom : ''}.
+  return `Declassify this client message. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 Client message:
@@ -262,7 +326,100 @@ app.use((req, res, next) => {
 });
 
 // ───────────────────────── routes ─────────────────────────
+app.get('/api/config', (req, res) => res.json(SB_ON ? { mode: 'supabase', supabaseUrl: SB_URL, supabaseAnonKey: SB_KEY } : { mode: 'legacy' }));
+
+function teamRoutes() {
+  const json = express.json({ limit: '32kb' });
+  const wrap = fn => async (req, res) => { try { await fn(req, res); } catch (e) { console.error(e); fail(res, 502, 'Something went wrong talking to the database.'); } };
+  const need = (req, res) => { if (!SB_ON) { fail(res, 404, 'Teams are not enabled.'); return false; } return true; };
+
+  app.get('/api/team', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    res.json({ user: { id: req.user, email: req.email }, team: await loadTeam(req.token, req.user, true) });
+  }));
+  app.post('/api/team/create', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const name = String((req.body && req.body.name) || '').trim().slice(0, 80);
+    if (!name) return fail(res, 400, 'Give your team a name.');
+    const r = await sb('/rest/v1/rpc/create_team', req.token, { method: 'POST', body: { team_name: name } });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not create the team.'));
+    res.json({ ok: true });
+  }));
+  app.post('/api/team/join', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const code = String((req.body && req.body.code) || '').trim().slice(0, 40);
+    if (!code) return fail(res, 400, 'Enter the invite code.');
+    const r = await sb('/rest/v1/rpc/join_team', req.token, { method: 'POST', body: { code } });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'That invite code did not work.'));
+    res.json({ ok: true });
+  }));
+  app.post('/api/team/rules', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can change company rules.');
+    const rules = String((req.body && req.body.rules) || '').slice(0, 2000);
+    const r = await sb(`/rest/v1/teams?id=eq.${t.id}`, req.token, { method: 'PATCH', body: { rules }, prefer: 'return=minimal' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not save the rules.'));
+    res.json({ ok: true });
+  }));
+  app.post('/api/team/invite-code', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can do that.');
+    const r = await sb('/rest/v1/rpc/new_invite_code', req.token, { method: 'POST', body: { tid: t.id } });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not make a new code.'));
+    res.json({ inviteCode: r.data });
+  }));
+  app.delete('/api/team/members/:uid', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.uid)) return fail(res, 400, 'Bad request.');
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can remove members.');
+    const r = await sb(`/rest/v1/members?team_id=eq.${t.id}&user_id=eq.${req.params.uid}&role=eq.member`, req.token, { method: 'DELETE', prefer: 'return=minimal' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not remove that member.'));
+    res.json({ ok: true });
+  }));
+
+  const cleanClient = body => {
+    const label = String((body && body.label) || '').trim().slice(0, 60);
+    const terms = [...new Set((Array.isArray(body && body.terms) ? body.terms : []).map(x => String(x).trim().slice(0, 100)).filter(Boolean))].slice(0, 60);
+    return { label, terms };
+  };
+  app.post('/api/clients', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can add clients.');
+    const c = cleanClient(req.body);
+    if (!c.label || !c.terms.length) return fail(res, 400, 'Add a label and at least one detail to hide.');
+    const r = await sb('/rest/v1/clients', req.token, { method: 'POST', body: { team_id: t.id, ...c }, prefer: 'return=representation' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not save the client.'));
+    res.json({ client: Array.isArray(r.data) ? r.data[0] : r.data });
+  }));
+  app.put('/api/clients/:id', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id)) return fail(res, 400, 'Bad request.');
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can edit clients.');
+    const c = cleanClient(req.body);
+    if (!c.label || !c.terms.length) return fail(res, 400, 'Add a label and at least one detail to hide.');
+    const r = await sb(`/rest/v1/clients?id=eq.${req.params.id}&team_id=eq.${t.id}`, req.token, { method: 'PATCH', body: c, prefer: 'return=representation' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not save the client.'));
+    res.json({ client: Array.isArray(r.data) ? r.data[0] : r.data });
+  }));
+  app.delete('/api/clients/:id', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id)) return fail(res, 400, 'Bad request.');
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can delete clients.');
+    const r = await sb(`/rest/v1/clients?id=eq.${req.params.id}&team_id=eq.${t.id}`, req.token, { method: 'DELETE', prefer: 'return=minimal' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not delete the client.'));
+    res.json({ ok: true });
+  }));
+}
+teamRoutes();
+
 app.post('/api/login', express.json({ limit: '4kb' }), (req, res) => {
+  if (SB_ON) return fail(res, 404, 'Use the account sign-in.');
   const lim = loginLimit(req.ip);
   if (!lim.ok) return fail(res, 429, `Too many sign-in attempts. Try again in ${Math.ceil(lim.retryAfter / 60)} minutes.`);
   if (USERS.size === 0) return fail(res, 503, 'Sign-in is not set up on the server yet. Add APP_USERS in the server settings.');
@@ -281,7 +438,7 @@ app.post('/api/logout', (req, res) => { clearSession(req, res); res.json({ ok: t
 app.get('/api/me', requireAuth, (req, res) => res.json({ user: req.user }));
 
 app.get('/api/health', requireAuth, async (req, res) => {
-  const info = { node: process.version, model: MODEL, keyPresent: ANTHROPIC_API_KEY.length > 0, usersConfigured: USERS.size, perHourLimit: RATE_PER_HOUR_USER };
+  const info = { node: process.version, model: MODEL, keyPresent: ANTHROPIC_API_KEY.length > 0, usersConfigured: USERS.size, supabase: SB_ON, perHourLimit: RATE_PER_HOUR_USER };
   if (req.query.test !== '1') return res.json({ ok: info.keyPresent, ...info, hint: 'Add ?test=1 to also test the AI connection.' });
   if (!info.keyPresent) return res.json({ ok: false, problem: 'ANTHROPIC_API_KEY is not set on the server', ...info });
   try {
@@ -321,10 +478,24 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   const ip = ipLimit(req.ip);
   if (!ip.ok) return fail(res, 429, 'Too many requests from this network. Please wait and try again.');
 
-  const terms = mode === 'reply' ? [] : Array.isArray(b.clientTerms) ? [...new Set(b.clientTerms.filter(t => typeof t === 'string').map(t => t.trim().slice(0, 100)).filter(t => t.length >= 2))].slice(0, 60) : [];
+  let terms = [], rules = '';
+  if (SB_ON) {
+    let team;
+    try { team = await loadTeam(req.token, req.user, false); } catch (e) { return fail(res, 502, 'Could not load your team: ' + e.message); }
+    if (!team) return fail(res, 403, 'Create or join a team first.');
+    if (mode !== 'reply') rules = team.rules.slice(0, 2000);
+    if (mode !== 'reply' && b.clientId) {
+      if (!isUuid(b.clientId)) return fail(res, 400, 'Unknown client.');
+      const c = await sb(`/rest/v1/clients?select=terms&id=eq.${b.clientId}&team_id=eq.${team.id}`, req.token);
+      if (!c.ok || !c.data || !c.data[0]) return fail(res, 400, 'That client was not found in your team.');
+      terms = (c.data[0].terms || []).filter(t => typeof t === 'string' && t.trim().length >= 2).slice(0, 60);
+    }
+  } else if (mode !== 'reply' && Array.isArray(b.clientTerms)) {
+    terms = [...new Set(b.clientTerms.filter(t => typeof t === 'string').map(t => t.trim().slice(0, 100)).filter(t => t.length >= 2))].slice(0, 60);
+  }
   const clientName = typeof b.clientName === 'string' ? b.clientName.trim().slice(0, 60) : '';
   const tone = ['friendly', 'professional', 'brief'].includes(b.tone) ? { friendly: 'warm and friendly', professional: 'formal and professional', brief: 'very short and direct' }[b.tone] : 'professional but warm';
-  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true });
+  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true, rules });
   const content = img
     ? [{ type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];
@@ -370,5 +541,6 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`ClearPass server running on port ${PORT}`);
   if (!ANTHROPIC_API_KEY) console.warn('WARNING: ANTHROPIC_API_KEY is not set');
-  if (USERS.size === 0) console.warn('WARNING: APP_USERS is not set, so nobody can sign in');
+  if (!SB_ON && USERS.size === 0) console.warn('WARNING: neither Supabase nor APP_USERS is set, so nobody can sign in');
+  if (SB_ON) console.log('Sign-in: Supabase accounts');
 });

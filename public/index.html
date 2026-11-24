@@ -241,6 +241,91 @@
   .member-row span{color:var(--text2);font-size:12px}
   .code-box{font-family:var(--mono);font-size:18px;letter-spacing:.12em;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:inline-block}
   .sec-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:1.1rem 0 6px}
+
+  /* ── v8: command bar + review ── */
+  .container.narrow{max-width:980px;padding:1.5rem 1.25rem 3rem}
+  .hero{margin-bottom:1.5rem}
+  .hero h1{font-size:clamp(1.7rem,4vw,2.3rem)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .bar{background:var(--surface);border:1px solid rgba(79,142,247,.4);border-radius:20px;padding:16px 18px;box-shadow:0 0 0 6px rgba(79,142,247,.07),0 24px 60px rgba(0,0,0,.45)}
+  .editor{position:relative}
+  .editor textarea,.editor .mirror{font-family:var(--sans);font-size:16px;line-height:1.75;padding:6px 4px;border:0;margin:0;width:100%;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;letter-spacing:normal}
+  .editor textarea{position:relative;display:block;background:transparent;color:var(--text);min-height:150px;resize:none;overflow:hidden;outline:none;border-radius:0}
+  .editor textarea:focus{border:0}
+  .editor .mirror{position:absolute;inset:0;color:transparent;pointer-events:none;overflow:hidden}
+  .mirror mark{color:transparent;border-radius:5px;padding:1px 0;margin:0 -2px;padding-left:2px;padding-right:2px}
+  .mirror mark.e{background:rgba(232,92,92,.22);box-shadow:inset 0 -2px #e85c5c}
+  .mirror mark.m{background:rgba(240,169,74,.2);box-shadow:inset 0 -2px #f0a94a}
+  .mirror mark.n{background:rgba(79,142,247,.22);box-shadow:inset 0 -2px #4f8ef7}
+  .livebar{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text3);min-height:22px;padding:0 4px}
+  #live-note{color:var(--green)}#live-note.quiet{color:var(--text3)}
+  #example-link{color:var(--accent);text-decoration:none}
+  .cr{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap}
+  .chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .chip{font-family:var(--sans);font-size:12.5px;padding:6px 12px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);background:rgba(255,255,255,.02);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .chip:hover{border-color:rgba(79,142,247,.5);color:var(--text)}
+  .chip.on{background:var(--accent-dim);border-color:rgba(79,142,247,.5);color:#9cc2ff}
+  .chip select{background:transparent;color:inherit;border:0;font-family:var(--sans);font-size:12.5px;max-width:150px;cursor:pointer;outline:none}
+  .chip select option{background:var(--surface2);color:var(--text)}
+  .sep{width:1px;height:20px;background:var(--border2)}
+  .runwrap{display:flex;align-items:center;gap:10px}.kbds{font-size:11px;color:var(--text3);border:1px solid var(--border2);border-radius:6px;padding:2px 7px}
+  .run-btn.run{width:auto;margin:0;padding:10px 22px}
+  .shot{display:none;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin-bottom:10px}
+  .shot.show{display:flex}.shot img{width:56px;height:56px;object-fit:cover;border-radius:8px}.shot div{flex:1;font-size:13px}.shot span{display:block;color:var(--text2);font-size:12px}
+  .x-btn{background:none;border:1px solid var(--border2);color:var(--text2);border-radius:8px;width:30px;height:30px;cursor:pointer}
+  .opts-panel{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .opts-panel.open{display:block}
+  .opts-panel .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:12px 0 8px}
+  .opts-panel .lbl:first-child{margin-top:0}
+  .opts-panel label{display:block;font-size:12.5px;color:var(--text2)}
+  .opts-panel textarea{min-height:64px;margin-top:6px;font-size:13px}
+  .opts-panel input[type=text],.opts-panel select{background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px;margin-top:6px;width:100%}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .reply-opts{display:none;gap:12px}.reply-opts label{flex:1}
+  .trust{text-align:center;font-size:12px;color:var(--text3);margin:12px 0 0}
+  #working{display:none;margin-top:1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px}
+  #working.show{display:block}
+  .wk-steps{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--text3)}
+  .wk-steps span.done{color:var(--green)}.wk-steps span.done:before{content:"✓ "}.wk-steps span.cur{color:var(--text)}.wk-steps span.cur:before{content:"● ";color:var(--accent);animation:pulse 1s ease infinite}
+  .wk-skel{height:14px;border-radius:6px;background:linear-gradient(90deg,var(--surface2),#262d38,var(--surface2));background-size:200% 100%;animation:sh 1.3s linear infinite;margin-top:12px}
+  @keyframes sh{to{background-position:-200% 0}}
+  #output-wrap{margin-top:1.25rem}
+  .res{background:var(--surface);border:1px solid rgba(61,186,126,.4);border-radius:16px;overflow:hidden}
+  .res-top{padding:.85rem 1.1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .res-body{padding:1.1rem}
+  .copy-primary{background:var(--green);color:#0a1f14;border-color:var(--green);font-weight:700}
+  .copy-primary:hover{color:#0a1f14;filter:brightness(1.08)}
+  .review{display:none;margin-top:1rem;border:1px solid var(--border);border-radius:14px;background:var(--surface2);padding:14px}
+  .review.open{display:block}
+  .rv-grid{display:grid;grid-template-columns:1fr 280px;gap:16px}
+  .rv-doc{font-size:15px;line-height:2;white-space:pre-wrap;word-break:break-word;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .rvx{background:rgba(255,255,255,.13);color:transparent;border-radius:4px;padding:0 2px;cursor:pointer;user-select:none}
+  .rvx:hover{background:rgba(255,255,255,.22)}
+  .rvk{background:rgba(61,186,126,.16);color:#8ee0b4;box-shadow:inset 0 -2px var(--green);border-radius:4px;padding:0 2px;cursor:pointer}
+  .rv-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border);font-size:13px}
+  .rv-item:first-of-type{border-top:0}.rv-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rv-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px;flex:none}
+  .sw{width:36px;height:20px;border-radius:99px;background:var(--accent);position:relative;border:0;cursor:pointer;flex:none}
+  .sw:after{content:"";position:absolute;right:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff}
+  .sw.off{background:#3a4150}.sw.off:after{right:auto;left:3px}
+  .rv-add{display:flex;gap:6px;margin:10px 0}.rv-add input{flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13px;min-width:0}
+  .rv-apply{width:100%;margin:0;padding:10px}
+  .rv-note{font-size:12px;color:var(--text3);margin-top:8px;line-height:1.5}
+  .history-section{margin-top:2rem}
+  #vault-editor{position:fixed;z-index:950;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,92vw);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.25rem;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
+  #vault-editor h3{font-size:15px;margin-bottom:10px}
+  #vault-editor input{width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;font-family:var(--sans);font-size:14px;margin-bottom:8px}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .runwrap{margin-left:auto}
+  @media (max-width:700px){
+    nav .nav-pill,.nav-pill{white-space:nowrap}
+    .api-indicator{display:none}
+    .rv-grid,.two{grid-template-columns:1fr}
+    .reply-opts{flex-direction:column}
+    .cr{flex-direction:column;align-items:stretch}
+    .runwrap{position:sticky;bottom:10px;z-index:5}
+    .run-btn.run{flex:1;padding:13px}.kbds{display:none}
+  }
 </style>
 </head>
 <body>
@@ -286,193 +371,132 @@
   </div>
 </nav>
 
-<main class="container">
+<main class="container narrow">
   <div class="hero">
     <div class="hero-eyebrow">
       <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Confidential message declassifier
     </div>
-    <h1>Strip sensitive info.<br /><span>Share only what matters.</span></h1>
-    <p>Paste client messages or upload screenshots. ClearPass redacts confidential details so your technical team gets the task, not the secrets.</p>
+    <h1>What do you want to <span>hide?</span></h1>
+    <p>Paste a message, drop a screenshot, or press Ctrl+V anywhere. Sensitive details light up before you send.</p>
   </div>
 
-<div class="workspace">
-<div class="col-in">
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span id="input-title">Client message</span>
+  <div class="bar" id="cmd-bar">
+    <div class="shot" id="shot-wrap">
+      <img id="img-preview" alt="Attached screenshot" />
+      <div><b>Screenshot attached</b><span>It will be read and cleaned.</span></div>
+      <button class="x-btn" onclick="removeImage()" aria-label="Remove screenshot">✕</button>
     </div>
-    <div class="mode-switch">
-      <button class="mode-btn on" id="mode-msg" onclick="setMode('msg')"><b>Client message</b><span>Remove names, budgets and sensitive details</span></button>
-      <button class="mode-btn" id="mode-brief" onclick="setMode('brief')"><b>Upwork job post to brief</b><span>Turn a job post into a task brief for your freelancer</span></button>
+    <div class="editor">
+      <div class="mirror" id="mirror" aria-hidden="true"></div>
+      <textarea id="msg-input" aria-label="Message to declassify" spellcheck="false" oninput="onInput()" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();runAgent();}"></textarea>
     </div>
-    <div class="tabs">
-      <button class="tab active" id="tab-text" onclick="switchTab('text')">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Text message
-      </button>
-      <button class="tab" id="tab-image" onclick="switchTab('image')">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        Image / screenshot
-      </button>
-    </div>
-    <div id="text-panel">
-      <textarea id="msg-input" placeholder="Paste the client's message, email, or request here…"></textarea>
-    </div>
-    <div id="image-panel" style="display:none">
-      <div class="upload-zone" id="upload-zone">
-        <input type="file" id="file-input" accept="image/*" onchange="handleImage(event)" />
-        <div id="upload-placeholder">
-          <div class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-          <div class="upload-label">Click or drag to upload</div>
-          <div class="upload-sub">PNG, JPG, WEBP — screenshots, emails, docs</div>
-        </div>
-        <img id="img-preview" alt="Uploaded preview" />
+    <div class="livebar"><span id="live-note"></span><a href="#" id="example-link" onclick="fillExample();return false">Try an example</a></div>
+    <div class="cr">
+      <div class="chips">
+        <button class="chip on" id="mode-msg" onclick="setMode('msg')">Message</button>
+        <button class="chip" id="mode-brief" onclick="setMode('brief')">Upwork brief</button>
+        <button class="chip" id="mode-reply" onclick="setMode('reply')">Reply</button>
+        <span class="sep"></span>
+        <label class="chip" title="Saved client: their details are always hidden">👤 <select id="vault-select" onchange="onClientChange()" aria-label="Saved client"></select></label>
+        <button class="chip" id="strict-chip" onclick="toggleStrict()" title="Also hide anything a freelancer could search for">🛡 Anti-poaching</button>
+        <button class="chip" onclick="document.getElementById('file-input').click()">📎 Screenshot</button>
+        <button class="chip" id="opts-chip" onclick="toggleOpts()">⚙ Options</button>
+      </div>
+      <div class="runwrap"><span class="kbds">Ctrl ⏎</span>
+        <button class="run-btn run" id="run-btn" onclick="runAgent()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="run-btn-label">Declassify</span></button>
       </div>
     </div>
-  </div>
+    <input type="checkbox" id="strict-on" class="sr-only" tabindex="-1" aria-hidden="true" />
+    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="handleImage(event)" />
 
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-      Client vault
-    </div>
-    <div class="vault-row">
-      <select id="vault-select" onchange="vaultSelect()"></select>
-      <button class="vault-btn" id="vault-edit-btn" onclick="vaultEdit(false)">Edit</button>
-      <button class="vault-btn" id="vault-new-btn" onclick="vaultEdit(true)">+ New client</button>
-    </div>
-    <div class="vault-editor" id="vault-editor">
-      <input id="vault-name" placeholder="Label for you only, e.g. Acme project" maxlength="60" />
-      <textarea id="vault-terms" placeholder="Everything about this client that must never reach a freelancer, one per line:&#10;Jane Miller&#10;Acme Robotics&#10;AcmeBot&#10;acme-robotics.com&#10;jane@acme-robotics.com" style="min-height:130px"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <button class="vault-btn" onclick="vaultSave()">Save client</button>
-        <button class="vault-btn danger" id="vault-del" onclick="vaultDelete()">Delete</button>
-        <button class="vault-btn" onclick="vaultClose()">Cancel</button>
+    <div class="opts-panel" id="opts-panel">
+      <div id="tags-wrap"><div class="lbl">Hide these</div><div class="tags-grid" id="tags-grid"></div></div>
+      <div class="reply-opts" id="reply-opts">
+        <label>Client first name (optional)<input type="text" id="reply-name" maxlength="60" /></label>
+        <label>Tone<select id="reply-tone"><option value="friendly">Friendly</option><option value="professional" selected>Professional</option><option value="brief">Short and direct</option></select></label>
       </div>
-    </div>
-    <div class="vault-note" id="vault-note">Pick a client and every run removes their saved names and details, even if the AI misses one. <span id="vault-local-note">Saved only in this browser, never on our server. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></span></div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-      What to redact
-    </div>
-    <div class="tags-grid" id="tags-grid"></div>
-    <label class="strict-row" id="strict-row"><input type="checkbox" id="strict-on" onchange="try{localStorage.setItem('cp_strict',this.checked?'1':'0')}catch(e){}" /> <span><b>Anti-poaching</b> — also hide anything a freelancer could search for (platform names, job IDs, rates, links, unique phrases)</span></label>
-    <div class="brief-note" id="brief-note"><b>Brief mode strips everything that could identify the client.</b> That covers the client and company name, the budget, the exact job title, links and usernames, plus combinations like industry + city + company size that a freelancer could search for on Upwork. Add anything extra in the custom rules below.</div>
-    <div class="custom-rules-wrap">
-      <label>Custom rules (optional) — describe anything else to redact, one per line</label>
-      <textarea id="custom-rules" placeholder="e.g. Any mention of the word 'prototype'&#10;References to our pricing model&#10;Internal team member names"></textarea>
+      <div class="two">
+        <label>Extra things to hide (one per line)<textarea id="custom-rules" placeholder="e.g. Any mention of the word 'prototype'&#10;Internal team member names"></textarea></label>
+        <label>Who is this for? (optional)<textarea id="team-context" placeholder="e.g. Frontend dev team. Focus on technical tasks only."></textarea></label>
+      </div>
+      <div class="lbl">Saved clients</div>
+      <div style="display:flex;gap:8px"><button class="vault-btn" id="vault-edit-btn" onclick="vaultEdit(false)">Edit selected</button><button class="vault-btn" id="vault-new-btn" onclick="vaultEdit(true)">+ New client</button></div>
+      <div class="vault-note" id="vault-note">Pick a client in the bar and every run removes their saved names and details, even if the AI misses one. <span id="vault-local-note">Saved only in this browser, never on our server. <a href="#" onclick="vaultBackup();return false" style="color:var(--accent)">Back up</a> · <a href="#" onclick="document.getElementById('vault-import').click();return false" style="color:var(--accent)">Restore</a><input type="file" id="vault-import" accept=".json" style="display:none" onchange="vaultRestore(event)" /></span></div>
     </div>
   </div>
+  <div class="trust">🔒 Your messages aren't stored on our server · saved clients and company rules are applied automatically</div>
 
-  <div class="card">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Team context (optional)
-    </div>
-    <textarea id="team-context" placeholder="e.g. This is going to the frontend dev team. Focus on technical tasks only." style="min-height:80px;"></textarea>
+  <div id="working" aria-live="polite">
+    <div class="wk-steps"><span id="wk1">Reading your message</span><span id="wk2">Finding sensitive details</span><span id="wk3">Writing the clean version</span></div>
+    <div class="wk-skel" style="width:90%"></div><div class="wk-skel" style="width:70%"></div>
   </div>
 
-  <button class="run-btn" id="run-btn" onclick="runAgent()">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    <span id="run-btn-label">Declassify message</span>
-  </button>
-
-</div>
-<div class="col-out">
-  <div class="empty-state"><b>Your result appears here</b>Paste a message on the left and press the button. You get text that is ready to copy and send.</div>
-  <!-- OUTPUT -->
   <div id="output-wrap">
-    <div class="output-card">
-      <div class="output-header">
-        <div class="output-header-left">
-          <span id="sensitivity-badge" class="status-badge"></span>
-          <span id="redact-count" style="font-size:13px;color:var(--text2);"></span>
-        </div>
+    <div class="res">
+      <div class="res-top">
+        <div style="display:flex;align-items:center;gap:10px"><span id="sensitivity-badge" class="status-badge"></span><span id="redact-count" style="font-size:13px;color:var(--text2);"></span></div>
         <div class="output-actions">
-          <button class="action-btn" onclick="copyClean()">
-            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy
-          </button>
-          <button class="action-btn" onclick="downloadTxt()">
-            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 0-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            .txt
-          </button>
-          <button class="action-btn" onclick="downloadPdf()">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            PDF
-          </button>
-          <button class="action-btn" onclick="downloadWord()">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><line x1="9" y1="9" x2="12" y2="9"/></svg>
-            Word
-          </button>
-          <button class="action-btn" onclick="downloadLog()" title="Private: contains the original client details. Do not share.">Private log</button>
+          <button class="action-btn copy-primary" id="copy-btn" onclick="copyClean()">Copy</button>
+          <button class="action-btn" onclick="downloadTxt()">.txt</button>
+          <button class="action-btn" onclick="downloadPdf()">PDF</button>
+          <button class="action-btn" onclick="downloadWord()">Word</button>
+          <button class="action-btn" id="review-btn" onclick="toggleReview()">Review details</button>
         </div>
       </div>
-      <div class="output-body">
+      <div class="res-body">
         <div class="leak-box" id="leak-box"></div>
-        <div class="ask-box" id="ask-box"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
         <div class="risk-box" id="risk-box"><b>Check before you send</b><ul id="risk-list"></ul></div>
-        <div class="output-section-label" id="clean-label">✅ Ready to send — copy this to your team</div>
-        <div style="position:relative;">
-          <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);padding-bottom:2.5rem;"></div>
-          <button onclick="copyClean()" id="copy-clean-btn" style="position:absolute;bottom:10px;right:10px;background:var(--green);color:#0a1f14;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Copy</button>
+        <div class="output-section-label" id="clean-label">✅ Ready to send</div>
+        <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);"></div>
+        <div class="ask-box" id="ask-box" style="margin-top:1rem"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
+
+        <div class="review" id="review">
+          <div class="rv-grid">
+            <div><div class="output-section-label">Your original. Click a hidden item to keep it, or a green one to hide it again.</div><div class="rv-doc" id="rv-doc"></div></div>
+            <div>
+              <div class="output-section-label">Found in this message</div><div id="rv-items"></div>
+              <div class="rv-add"><input id="rv-add" maxlength="100" placeholder="Hide another word or phrase" onkeydown="if(event.key==='Enter'){event.preventDefault();rvAdd();}" /><button class="vault-btn" onclick="rvAdd()">Add</button></div>
+              <button class="run-btn rv-apply" id="rv-apply" onclick="rvApply()" disabled>Update clean text</button>
+              <div class="rv-note">Changes are applied by the AI, so the sentence reads naturally. This uses one run.</div>
+            </div>
+          </div>
         </div>
+
         <details class="more" id="more-details">
           <summary>Show details: what was removed and summary</summary>
           <div class="more-body">
-        <div class="divider"></div>
-        <div class="output-section-label">Full declassified view — with redaction markers</div>
-        <div class="message-box" id="output-msg"></div>
-        <div class="divider"></div>
-        <div class="output-section-label">Task summary for team</div>
-        <div class="summary-box" id="output-summary"></div>
-        <div class="divider"></div>
-        <div class="output-section-label">What was redacted</div>
-        <div id="output-redacted-wrap"></div>
+            <div class="output-section-label" style="margin-top:12px">Full view with redaction markers</div>
+            <div class="message-box" id="output-msg"></div>
+            <div class="divider"></div>
+            <div class="output-section-label">Task summary for team</div>
+            <div class="summary-box" id="output-summary"></div>
+            <div class="divider"></div>
+            <div class="output-section-label">What was redacted</div>
+            <div id="output-redacted-wrap"></div>
+            <div style="margin-top:12px"><button class="action-btn" onclick="downloadLog()" title="Private: contains the original client details. Do not share.">Download private log (contains originals)</button></div>
           </div>
         </details>
       </div>
     </div>
   </div>
 
-
-
-  <div class="card" id="reply-card" style="margin-top:1rem">
-    <div class="card-title">
-      <svg viewBox="0 0 24 24"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
-      Reply to your client
-    </div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">Paste what your freelancer wrote. You get a message for your client that never mentions the freelancer.</div>
-    <textarea id="reply-input" placeholder="Paste the freelancer's update or question here…" style="min-height:110px"></textarea>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-      <input id="reply-name" placeholder="Client first name (optional)" maxlength="60" style="flex:1;min-width:150px;background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px" />
-      <select id="reply-tone" style="background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px">
-        <option value="friendly">Friendly</option><option value="professional" selected>Professional</option><option value="brief">Short and direct</option>
-      </select>
-      <button class="vault-btn" id="reply-btn" onclick="runReply()">Draft reply</button>
-    </div>
-    <div id="reply-out-wrap" style="display:none;margin-top:12px;position:relative">
-      <div class="output-section-label">Ready to send to your client</div>
-      <div class="message-box" id="reply-out" style="border-color:rgba(61,186,126,0.3);padding-bottom:2.5rem"></div>
-      <button onclick="copyReply()" style="position:absolute;bottom:10px;right:10px;background:var(--green);color:#0a1f14;border:none;border-radius:8px;padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);">Copy</button>
-    </div>
-  </div>
-</div>
-</div>
-
   <div class="history-section" id="history-section" style="display:none">
-    <div class="history-title">
-      Recent sessions
-      <button class="history-clear" onclick="clearHistory()">Clear all</button>
-    </div>
+    <div class="history-title">Recent sessions <button class="history-clear" onclick="clearHistory()">Clear all</button></div>
     <div class="history-list" id="history-list"></div>
   </div>
 </main>
+
+<div class="vault-editor" id="vault-editor">
+  <h3>Saved client</h3>
+  <input id="vault-name" placeholder="Label for you only, e.g. Acme project" maxlength="60" />
+  <textarea id="vault-terms" placeholder="Everything about this client that must never reach your team, one per line:&#10;Jane Miller&#10;Acme Robotics&#10;AcmeBot&#10;acme-robotics.com&#10;jane@acme-robotics.com" style="min-height:130px"></textarea>
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <button class="vault-btn" onclick="vaultSave()">Save client</button>
+    <button class="vault-btn danger" id="vault-del" onclick="vaultDelete()">Delete</button>
+    <button class="vault-btn" onclick="vaultClose()">Cancel</button>
+  </div>
+</div>
 
 <footer>ClearPass — built with Claude AI &nbsp;·&nbsp; <a href="https://docs.anthropic.com" target="_blank">Anthropic docs</a></footer>
 </div>
@@ -647,12 +671,28 @@ function renderTeam() {
     ${owner ? `<div class="sec-label">Invite code</div><div><span class="code-box" id="inv-code">${escHtml(TEAM.inviteCode||'—')}</span>
       <button class="vault-btn" style="margin-left:8px" onclick="teamNewCode()">New code</button></div>
       <div class="vault-note">Share this code with your staff. They create an account, then choose Join a team. Make a new code to stop the old one working.</div>` : ''}
+    ${owner ? `<div class="sec-label">Activity</div><div id="team-activity" class="vault-note" style="margin:0">Loading…</div>` : ''}
     <div class="sec-label">Company rules</div>
     <div class="vault-note" style="margin:0 0 6px">Applied to every run by everyone on the team, for example "Never include our pricing or margins."</div>
     ${owner ? `<textarea id="team-rules" maxlength="2000" style="min-height:90px">${escHtml(TEAM.rules||'')}</textarea>
       <div style="margin-top:8px"><button class="vault-btn" onclick="teamSaveRules()">Save rules</button></div>`
       : `<div class="message-box" style="min-height:0">${TEAM.rules ? escHtml(TEAM.rules) : '<i style="color:var(--text3)">None set.</i>'}</div>`}
     <div style="display:flex;justify-content:space-between;margin-top:1.25rem"><button class="vault-btn" onclick="doLogout()">Sign out</button><button class="vault-btn" onclick="closeTeam()">Close</button></div>`;
+  if (owner) loadActivity();
+}
+const MODE_NAME = { msg: 'Message', brief: 'Upwork brief', reply: 'Reply' };
+async function loadActivity() {
+  const box = document.getElementById('team-activity'); if (!box) return;
+  const r = await api('/api/team/activity'); const d = await r.json().catch(()=>({}));
+  if (!r.ok) { box.textContent = (d.error && d.error.message) || 'Could not load activity.'; return; }
+  const rows = d.activity || [];
+  if (!rows.length) { box.textContent = 'No runs yet. Message text is never stored here, only who ran what and when.'; return; }
+  const month = new Date().toISOString().slice(0,7), counts = {};
+  rows.forEach(x => { if ((x.created_at||'').slice(0,7) === month) counts[x.email||'Unknown'] = (counts[x.email||'Unknown']||0) + 1; });
+  const sum = Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([e,n]) => `${escHtml(e)}: ${n}`).join(' · ');
+  box.innerHTML = (sum ? `<div style="margin-bottom:8px">This month: ${sum}</div>` : '') +
+    '<div style="max-height:180px;overflow:auto">' + rows.slice(0,30).map(x => `<div class="member-row"><div>${escHtml(x.email||'Unknown')} <span>${MODE_NAME[x.mode]||x.mode}${x.client_label ? ' · ' + escHtml(x.client_label) : ''}</span></div><span>${new Date(x.created_at).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></div>`).join('') + '</div>' +
+    '<div style="margin-top:6px">No message text is stored. Showing the latest 30 runs.</div>';
 }
 async function teamSaveRules() {
   const r = await api('/api/team/rules', { method:'POST', headers:jsonHdr, body: JSON.stringify({ rules: document.getElementById('team-rules').value }) });
@@ -707,6 +747,7 @@ function showApp() {
   vaultLoad();
   applyTeamUi();
   try { document.getElementById('strict-on').checked = localStorage.getItem('cp_strict')==='1'; } catch(e) {}
+  syncStrict(); setMode(mode);
 }
 
 function applyTeamUi() {
@@ -720,7 +761,7 @@ function applyTeamUi() {
 }
 
 // ── STATE ──
-let activeTab = 'text', imageBase64 = null, imageMediaType = null, mode = 'msg', lastSource = '';
+let imageBase64 = null, imageMediaType = null, mode = 'msg', lastSource = '';
 let history = [], currentOutput = null;
 
 const TAGS = [
@@ -743,45 +784,119 @@ function renderTags() {
 
 function setMode(m) {
   mode = m;
-  document.getElementById('mode-msg').classList.toggle('on', m==='msg');
-  document.getElementById('mode-brief').classList.toggle('on', m==='brief');
-  document.getElementById('tags-grid').style.display = m==='msg' ? 'flex' : 'none';
-  document.getElementById('strict-row').style.display = m==='msg' ? 'flex' : 'none';
-  document.getElementById('brief-note').style.display = m==='brief' ? 'block' : 'none';
+  ['msg','brief','reply'].forEach(k=>document.getElementById('mode-'+k).classList.toggle('on', m===k));
+  document.getElementById('tags-wrap').style.display = m==='msg' ? '' : 'none';
+  document.getElementById('strict-chip').style.display = m==='msg' ? '' : 'none';
+  document.getElementById('reply-opts').style.display = m==='reply' ? 'flex' : 'none';
   document.getElementById('msg-input').placeholder = m==='brief'
-    ? 'Paste the full Upwork job post here: title, description, budget, skills, everything…'
-    : "Paste the client's message, email, or request here…";
-  document.getElementById('input-title').textContent = m==='brief' ? 'Upwork job post' : 'Client message';
-  document.getElementById('run-btn-label').textContent = m==='brief' ? 'Create freelancer brief' : 'Declassify message';
+    ? 'Paste the full Upwork job post: title, description, budget, skills, everything…'
+    : m==='reply' ? "Paste the freelancer's message. We'll draft a safe reply for your client…"
+    : "Paste the client's message, email or request…";
+  document.getElementById('run-btn-label').textContent = m==='brief' ? 'Create brief' : m==='reply' ? 'Draft reply' : 'Declassify';
+  scan();
 }
-
+function toggleOpts() { const p=document.getElementById('opts-panel'); p.classList.toggle('open'); document.getElementById('opts-chip').classList.toggle('on', p.classList.contains('open')); }
+function toggleStrict() { const c=document.getElementById('strict-on'); c.checked=!c.checked; syncStrict(); try{localStorage.setItem('cp_strict', c.checked?'1':'0');}catch(e){} }
+function syncStrict() { document.getElementById('strict-chip').classList.toggle('on', document.getElementById('strict-on').checked); }
 function getActiveTags() {
   if (mode === 'brief') return ['strict_brief'];
   return Array.from(document.querySelectorAll('.tag-btn.on')).map(b => b.dataset.key);
 }
 
-function switchTab(tab) {
-  activeTab = tab;
-  document.getElementById('text-panel').style.display = tab==='text'?'block':'none';
-  document.getElementById('image-panel').style.display = tab==='image'?'block':'none';
-  document.getElementById('tab-text').classList.toggle('active', tab==='text');
-  document.getElementById('tab-image').classList.toggle('active', tab==='image');
+// ── LIVE SCAN (runs in the browser only; the AI still does the real work) ──
+const SCAN_RX = [
+  ['e', /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g],
+  ['e', /\bhttps?:\/\/[^\s)]+|\bwww\.[^\s)]+/gi],
+  ['e', /(?:\+?\d[\d\s().-]{7,}\d)/g],
+  ['m', /(?:[$€£]|USD|AED|PKR|EUR|GBP)\s?\d[\d,]*(?:\.\d+)?(?:\s?[kKmM])?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|AED|PKR|EUR|GBP|dollars|k)\b/g],
+];
+function escRx(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function selectedClient() { const id=document.getElementById('vault-select').value; return vault.find(c=>c.id===id)||null; }
+function scanRanges(t) {
+  const r=[];
+  SCAN_RX.forEach(([k,rx])=>{ rx.lastIndex=0; let m; while((m=rx.exec(t))){ if(m[0].length) r.push([m.index,m.index+m[0].length,k]); if(m.index===rx.lastIndex) rx.lastIndex++; } });
+  const c=selectedClient();
+  if (c) (c.terms||[]).filter(x=>x&&x.length>=2).forEach(x=>{ const rx=new RegExp(escRx(x),'gi'); let m; while((m=rx.exec(t))) r.push([m.index,m.index+m[0].length,'n']); });
+  r.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+  const out=[]; r.forEach(x=>{ const l=out[out.length-1]; if(l && x[0]<l[1]) { if(x[1]>l[1]) l[1]=x[1]; } else out.push(x.slice()); });
+  return out;
+}
+function scan() {
+  const ta=document.getElementById('msg-input'), t=ta.value;
+  ta.style.height='auto'; ta.style.height=Math.max(150,ta.scrollHeight)+'px';
+  const note=document.getElementById('live-note');
+  let html='', pos=0, n=0;
+  if (mode!=='reply') { scanRanges(t).forEach(([s,e,k])=>{ html+=escHtml(t.slice(pos,s))+`<mark class="${k}">${escHtml(t.slice(s,e))}</mark>`; pos=e; n++; }); }
+  html+=escHtml(t.slice(pos))+'\n ';
+  document.getElementById('mirror').innerHTML=html;
+  const chat = mode==='msg' && t.length>20 ? parseChat(t) : null;
+  if (chat) { note.className=''; note.innerHTML=`Looks like a chat export (${chat.length} messages). <a href="#" onclick="chatCleanNow();return false" style="color:var(--accent)">Clean it up</a>: removes timestamps, names become Person A, B.`; return; }
+  if (mode==='reply') { note.textContent=''; return; }
+  note.className = n ? '' : 'quiet';
+  note.textContent = !t.trim() ? '' : n ? `Live scan: ${n} sensitive item${n>1?'s':''} found. The AI will also catch names and company details.` : 'Nothing obvious found yet. The AI still checks names and company details.';
 }
 
-function handleImage(e) {
-  const file = e.target.files[0]; if (!file) return;
+// ── CHAT CLEANUP (WhatsApp / Slack pastes) ──
+const WA_RX = /^‎?\[?(\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4}),?\s+\d{1,2}[:.]\d{2}(?::\d{2})?(?:\s?[APap]\.?[Mm]\.?)?\]?\s*(?:-\s*)?([^:]{1,60}):\s?(.*)$/;
+const WA_SYS = /end-to-end encrypted|<media omitted>|image omitted|this message was deleted|you deleted this message|missed (?:voice|video) call|security code changed|joined using this|messages and calls/i;
+const SL_RX = /^(.{2,60}?)\s+(?:\[)?(\d{1,2}:\d{2}(?::\d{2})?\s?(?:[AP]M)?)(?:\])?\s*$/i;
+function parseChat(t) {
+  const lines = t.replace(/\r/g,'').split('\n'); const msgs=[]; let cur=null, wa=0, sl=0;
+  for (const raw of lines) {
+    const l = raw.replace(/‎/g,'');
+    let m = l.match(WA_RX);
+    if (m) { wa++; if (WA_SYS.test(m[3])) { cur=null; continue; } cur={who:m[2].trim(),text:m[3]}; msgs.push(cur); continue; }
+    m = l.match(SL_RX);
+    if (m && !/[.!?,]$/.test(m[1]) && m[1].split(' ').length<=4) { sl++; cur={who:m[1].trim(),text:''}; msgs.push(cur); continue; }
+    if (cur && l.trim()) cur.text += (cur.text?'\n':'') + l.trim();
+    else if (WA_SYS.test(l)) cur=null;
+  }
+  const good = msgs.filter(x=>x.text.trim());
+  return (wa>=2 || sl>=2) && good.length>=2 ? good : null;
+}
+function cleanChat(msgs) {
+  const names=[...new Set(msgs.map(m=>m.who))];
+  const label=n=>'Person '+String.fromCharCode(65+names.indexOf(n)%26);
+  return { text: msgs.map(m=>label(m.who)+': '+m.text).join('\n'), people: names.length };
+}
+function chatCleanNow() {
+  const ta=document.getElementById('msg-input'); const msgs=parseChat(ta.value); if(!msgs) return;
+  const names=[...new Set(msgs.map(m=>m.who))]; const r=cleanChat(msgs);
+  ta.value=r.text; const c=document.getElementById('custom-rules');
+  c.value=(c.value?c.value+'\n':'')+names.map(n=>n).join('\n'); // also hide the real speaker names if they appear inside messages
+  scan(); toast('Chat cleaned: timestamps removed, names replaced with Person A, B…');
+}
+function onInput() { scan(); }
+function onClientChange() { scan(); }
+function fillExample() {
+  const ta=document.getElementById('msg-input');
+  ta.value = mode==='brief'
+    ? "Looking for a React dev to build the dashboard for Acme Robotics (acme-robotics.com). Budget $4,500 fixed. Contact Jane Miller at jane@acme-robotics.com. Launch by March 3."
+    : "Hi team, Jane Miller from Acme Robotics here. Our budget is $4,500 and we need the login page done by March 3. Call me on +1 415 555 0142 or email jane@acme-robotics.com.";
+  scan(); ta.focus();
+}
+
+// ── SCREENSHOT ──
+function loadImageFile(file) {
+  if (!file || !/^image\//.test(file.type)) return;
+  if (file.size > 5*1024*1024) { toast('That image is over 5 MB'); return; }
   imageMediaType = file.type;
   const reader = new FileReader();
   reader.onload = ev => {
     imageBase64 = ev.target.result.split(',')[1];
-    const preview = document.getElementById('img-preview');
-    preview.src = ev.target.result; preview.style.display = 'block';
-    document.getElementById('upload-placeholder').style.display = 'none';
-    document.getElementById('upload-zone').classList.add('has-image');
+    document.getElementById('img-preview').src = ev.target.result;
+    document.getElementById('shot-wrap').classList.add('show');
   };
   reader.readAsDataURL(file);
 }
-
+function handleImage(e) { loadImageFile(e.target.files[0]); e.target.value=''; }
+function removeImage() { imageBase64=null; imageMediaType=null; document.getElementById('shot-wrap').classList.remove('show'); }
+document.addEventListener('paste', e => {
+  const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));
+  if (it && document.getElementById('app-screen').classList.contains('visible')) { e.preventDefault(); loadImageFile(it.getAsFile()); }
+});
+document.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+document.addEventListener('drop', e => { const f=e.dataTransfer&&e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) { e.preventDefault(); loadImageFile(f); } });
 
 // ── CLIENT VAULT (stored only in this browser) ──
 let vault = []; let vaultEditing = null;
@@ -791,6 +906,7 @@ function vaultRender() {
   const sel = document.getElementById('vault-select'); const cur = sel.value;
   sel.innerHTML = '<option value="">No saved client</option>' + vault.map(c=>`<option value="${escHtml(c.id)}">${escHtml(c.name||c.label)} (${c.terms.length} terms)</option>`).join('');
   if (vault.some(c=>c.id===cur)) sel.value = cur;
+  if (typeof scan==='function') scan();
 }
 function vaultSelect() { /* selection is read at run time */ }
 function vaultTerms() {
@@ -832,7 +948,7 @@ async function vaultDelete() {
 }
 function vaultBackup() {
   if (!vault.length) { toast('Nothing to back up yet'); return; }
-  saveBlob(new Blob([JSON.stringify(vault,null,2)],{type:'application/json'}), 'clearpass-client-vault.json');
+  saveBlob(JSON.stringify(vault,null,2), 'application/json', 'clearpass-client-vault.json');
 }
 function vaultRestore(e) {
   const f = e.target.files[0]; if (!f) return;
@@ -845,86 +961,98 @@ function vaultRestore(e) {
   r.readAsText(f); e.target.value = '';
 }
 
-// ── REPLY DRAFTER ──
-async function runReply() {
-  const text = document.getElementById('reply-input').value.trim();
-  if (!text) { toast('Paste the freelancer\'s message first'); return; }
-  const btn = document.getElementById('reply-btn'); btn.disabled = true; btn.textContent = 'Drafting…';
-  try {
-    let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 90000); });
-    const res = await Promise.race([timeout, api('/api/declassify', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mode:'reply', text, clientName: document.getElementById('reply-name').value.trim(), tone: document.getElementById('reply-tone').value, context: document.getElementById('team-context').value.trim(), clientTerms: vaultTerms() }) })]);
-    clearTimeout(timer);
-    const raw = await res.text(); let data;
-    try { data = JSON.parse(raw); } catch(e) { toast('The server sent back a web page instead of data. It may be starting up, so try again in a minute.', 9000); return; }
-    if (res.status === 401) { sessionExpired(); return; }
-    if (!res.ok || !data.result) { toast((data.error && data.error.message) || ('Server error ('+res.status+')'), 9000); return; }
-    document.getElementById('reply-out').textContent = data.result.clean_message || '';
-    document.getElementById('reply-out-wrap').style.display = 'block';
-  } catch(err) { toast(err.message==='TIMEOUT' ? 'Timed out. Please try again.' : 'Error: '+err.message); }
-  finally { btn.disabled = false; btn.textContent = 'Draft reply'; }
-}
-function copyReply() {
-  const t = document.getElementById('reply-out').textContent;
-  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(()=>toast('Copied'), ()=>toast('Select the text and copy it'));
-}
-
 // ── RUN ──
-async function runAgent() {
+function wkStep(n){ [1,2,3].forEach(i=>{ const e=document.getElementById('wk'+i); e.className = i<n?'done':i===n?'cur':''; }); }
+async function runAgent(opts) {
+  opts = opts || {};
   const tags = getActiveTags();
-  if (!tags.length) { toast('Select at least one redaction category'); return; }
-  const payload = { mode, tags: mode==='brief' ? [] : tags,
+  if (mode==='msg' && !tags.length) { toast('Select at least one category under Options'); return; }
+  const msg = document.getElementById('msg-input').value.trim();
+  const payload = { mode, tags: mode==='msg' ? tags : [],
     custom: document.getElementById('custom-rules').value.trim(),
     context: document.getElementById('team-context').value.trim(),
-    clientTerms: vaultTerms(), clientId: teamMode ? document.getElementById('vault-select').value : '', strict: mode==='msg' && document.getElementById('strict-on').checked };
-  if (activeTab === 'text') {
-    const msg = document.getElementById('msg-input').value.trim();
-    if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first'); return; }
+    clientTerms: vaultTerms(), clientId: teamMode ? document.getElementById('vault-select').value : '',
+    strict: mode==='msg' && document.getElementById('strict-on').checked };
+  if (opts.keep && opts.keep.length) payload.keep = opts.keep;
+  if (opts.extra && opts.extra.length) payload.extra = opts.extra;
+  if (mode==='reply') {
+    if (!msg) { toast("Paste the freelancer's message first"); return; }
+    payload.text = msg; payload.clientName = document.getElementById('reply-name').value.trim(); payload.tone = document.getElementById('reply-tone').value; payload.clientTerms = []; payload.clientId = '';
     lastSource = msg;
-    payload.text = msg;
+  } else if (imageBase64 && !opts.reuse) {
+    lastSource = ''; payload.image = { media_type: imageMediaType, data: imageBase64 };
+  } else if (opts.reuse && lastSource) {
+    payload.text = lastSource;
   } else {
-    if (!imageBase64) { toast('Upload an image first'); return; }
-    lastSource = '';
-    payload.image = { media_type: imageMediaType, data: imageBase64 };
+    if (!msg) { toast(mode==='brief' ? 'Paste the job post first' : 'Paste a client message first, or drop a screenshot'); return; }
+    lastSource = msg; payload.text = msg;
   }
-  const btn = document.getElementById('run-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spinner-ring"></div> ' + (mode==='brief' ? 'Writing brief… up to a minute' : 'Declassifying…');
+  const btn = document.getElementById('run-btn'), lab = document.getElementById('run-btn-label'), prev = lab.textContent;
+  btn.disabled = true; lab.textContent = mode==='brief' ? 'Writing… up to a minute' : 'Working…';
   document.getElementById('output-wrap').classList.remove('show');
+  const wk = document.getElementById('working'); wk.classList.add('show'); wkStep(1);
+  const t1 = setTimeout(()=>wkStep(2), 1500), t2 = setTimeout(()=>wkStep(3), 5000);
   try {
     let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 120000); });
-    const res = await Promise.race([timeout, api('/api/declassify', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    })]);
+    const res = await Promise.race([timeout, api('/api/declassify', { method:'POST', headers:jsonHdr, body: JSON.stringify(payload) })]);
     clearTimeout(timer);
-    const rawText = await res.text();
-    let data;
+    const rawText = await res.text(); let data;
     try { data = JSON.parse(rawText); }
     catch (e) {
-      const looksHtml = /^\s*</.test(rawText);
-      toast(looksHtml
-        ? 'The server sent back a web page instead of data (status '+res.status+'). It may still be starting up or redeploying, so wait a minute and retry. Make sure you are using your Render address, not a preview or a saved file.'
+      toast(/^\s*</.test(rawText)
+        ? 'The server sent back a web page instead of data (status '+res.status+'). It may still be starting up, so wait a minute and retry.'
         : 'Unexpected reply from the server (status '+res.status+'): '+rawText.slice(0,120), 12000);
       return;
     }
     if (res.status === 401) { sessionExpired(); return; }
     if (data.error || !res.ok) { const m = data.error && (data.error.message || (typeof data.error==='string' ? data.error : JSON.stringify(data.error))); toast(m || ('Server error ('+res.status+')'), 9000); return; }
-    const parsed = data.result;
-    parsed._mode = mode;
-    if (!parsed.declassified_message && lastSource) {
+    const parsed = data.result; parsed._mode = mode;
+    if (mode!=='reply' && !parsed.declassified_message && lastSource) {
       let t = lastSource;
-      (parsed.redacted_items||[]).filter(r=>r.original).sort((a,b)=>b.original.length-a.original.length)
-        .forEach(r=>{ t = t.split(r.original).join(r.token||'[REDACTED]'); });
+      (parsed.redacted_items||[]).filter(r=>r.original).sort((a,b)=>b.original.length-a.original.length).forEach(r=>{ t = t.split(r.original).join(r.token||'[REDACTED]'); });
       parsed.declassified_message = t;
     }
-    currentOutput = parsed;
-    renderOutput(parsed);
-    saveHistory(parsed);
-  } catch(err) { console.error(err); toast(err.message==='TIMEOUT' ? 'Timed out after 2 minutes. The server may be waking up, so try again.' : 'Error: '+err.message); } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span id="run-btn-label">' + (mode==='brief' ? 'Create freelancer brief' : 'Declassify message') + '</span>';
+    if (!lastSource && parsed.extracted_text) lastSource = parsed.extracted_text;
+    currentOutput = parsed; renderOutput(parsed);
+    if (mode!=='reply') saveHistory(parsed);
+  } catch(err) { console.error(err); toast(err.message==='TIMEOUT' ? 'Timed out after 2 minutes. The server may be waking up, so try again.' : 'Error: '+err.message); }
+  finally { clearTimeout(t1); clearTimeout(t2); wk.classList.remove('show'); btn.disabled = false; lab.textContent = prev; }
+}
+
+// ── REVIEW (F) ──
+let rv = { items: [], keep: new Set(), extra: [], dirty: false };
+function toggleReview() {
+  const box=document.getElementById('review');
+  if (box.classList.contains('open')) { box.classList.remove('open'); return; }
+  buildReview(); box.classList.add('open'); box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function buildReview() {
+  const d=currentOutput||{}; const seen=new Set();
+  rv.items=(d.redacted_items||[]).filter(r=>r.original && !seen.has(r.original) && seen.add(r.original)).map(r=>({original:r.original,category:r.category||'other'}));
+  rv.keep=new Set(); rv.extra=[]; rv.dirty=false; renderReview();
+}
+const CAT_COL = { client_name:'#e85c5c', company:'#e85c5c', contact_info:'#e85c5c', email:'#e85c5c', phone:'#e85c5c', budget:'#f0a94a', location:'#4f8ef7', dates:'#4f8ef7' };
+function renderReview() {
+  const src=lastSource||''; const all=rv.items.map(i=>i.original).concat(rv.extra);
+  const doc=document.getElementById('rv-doc');
+  if (!src) { doc.textContent='The original text is not available for this item.'; }
+  else {
+    const rx=new RegExp(all.filter(Boolean).sort((a,b)=>b.length-a.length).map(escRx).join('|')||'(?!)','g');
+    let out='', pos=0, m;
+    while((m=rx.exec(src))){ const kept=rv.keep.has(m[0]); out+=escHtml(src.slice(pos,m.index))+`<span class="${kept?'rvk':'rvx'}" data-v="${escHtml(m[0])}" onclick="rvToggle(this.dataset.v)" title="${kept?'Visible: click to hide':'Hidden: click to keep'}">${escHtml(m[0])}</span>`; pos=m.index+m[0].length; if(!m[0].length) rx.lastIndex++; }
+    doc.innerHTML=out+escHtml(src.slice(pos));
   }
+  const list=rv.items.concat(rv.extra.map(x=>({original:x,category:'added by you'})));
+  document.getElementById('rv-items').innerHTML = list.length ? list.map(i=>`<div class="rv-item"><span><i class="rv-dot" style="background:${CAT_COL[i.category]||'#8a93a3'}"></i>${escHtml(i.original)}</span><button class="sw ${rv.keep.has(i.original)?'off':''}" data-v="${escHtml(i.original)}" onclick="rvToggle(this.dataset.v)" aria-label="Hide ${escHtml(i.original)}" aria-pressed="${!rv.keep.has(i.original)}"></button></div>`).join('') : '<div class="rv-note">Nothing was found to hide.</div>';
+  document.getElementById('rv-apply').disabled=!rv.dirty;
+}
+function rvToggle(v) { if (rv.keep.has(v)) rv.keep.delete(v); else rv.keep.add(v); rv.dirty=true; renderReview(); }
+function rvAdd() { const i=document.getElementById('rv-add'), v=i.value.trim(); if(!v) return; if(!rv.items.some(x=>x.original===v)&&!rv.extra.includes(v)) rv.extra.push(v); rv.keep.delete(v); i.value=''; rv.dirty=true; renderReview(); }
+async function rvApply() {
+  const keep=[...rv.keep], extra=rv.extra.slice();
+  const m=mode; mode=currentOutput._mode||mode;
+  const b=document.getElementById('rv-apply'); b.disabled=true;
+  try { await runAgent({ keep, extra, reuse:true }); } finally { mode=m; }
 }
 
 // ── RENDER ──
@@ -959,17 +1087,22 @@ function renderOutput(d) {
       d.redacted_items.map(r=>`<tr><td class="category">${escHtml(r.category||'')}</td><td class="original">${escHtml(r.original||'')}</td><td style="font-family:var(--mono);font-size:12px;color:var(--text3)">${escHtml(r.token||'')}</td></tr>`).join('')
     }</tbody></table>`;
   }
+  const reply = d._mode==='reply';
+  document.getElementById('review').classList.remove('open');
+  document.getElementById('review-btn').style.display = (reply || !lastSource) ? 'none' : '';
+  document.getElementById('more-details').style.display = reply ? 'none' : '';
+  if (reply) { document.getElementById('sensitivity-badge').className='status-badge status-low'; document.getElementById('sensitivity-badge').textContent='Reply draft'; document.getElementById('redact-count').textContent=''; document.getElementById('clean-label').textContent='✅ Reply for your client'; document.getElementById('leak-box').style.display='none'; document.getElementById('risk-box').style.display='none'; document.getElementById('ask-box').style.display='none'; }
   document.getElementById('output-wrap').classList.add('show');
-  if (window.innerWidth <= 900) document.getElementById('output-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
+  document.getElementById('output-wrap').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 // ── DOWNLOADS ──
 function copyClean() {
   if (!currentOutput) return;
   navigator.clipboard.writeText(currentOutput.clean_message || currentOutput.declassified_message || '').then(() => {
-    const btn = document.getElementById('copy-clean-btn');
+    const btn = document.getElementById('copy-btn');
     btn.textContent = 'Copied!';
-    setTimeout(()=>btn.textContent='Copy', 2000);
+    setTimeout(()=>btn.textContent='Copy', 2000); toast('Copied');
   });
 }
 
@@ -1085,7 +1218,7 @@ function renderHistory() {
 }
 function restoreHistory(id) {
   const entry = history.find(h=>h.id===id); if (!entry) return;
-  currentOutput = entry.data; renderOutput(entry.data);
+  currentOutput = entry.data; lastSource = ''; mode = entry.data._mode||'msg'; renderOutput(entry.data);
 }
 
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

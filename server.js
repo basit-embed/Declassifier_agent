@@ -16,7 +16,11 @@ const tidy = v => String(v || '').trim().replace(/^["']|["']$/g, '').trim();
 const ANTHROPIC_API_KEY = tidy(process.env.ANTHROPIC_API_KEY);
 
 // Supabase (public values only; no secret keys are needed)
-const SB_URL = tidy(process.env.SUPABASE_URL).replace(/\/+$/, '');
+const SB_URL = (() => {
+  const raw = tidy(process.env.SUPABASE_URL);
+  if (!raw) return '';
+  try { return new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw).origin; } catch { return raw.replace(/\/+$/, ''); }
+})();
 const SB_KEY = tidy(process.env.SUPABASE_ANON_KEY);
 const SB_ON = !!(SB_URL && SB_KEY);
 
@@ -362,6 +366,14 @@ function teamRoutes() {
     if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not save the rules.'));
     res.json({ ok: true });
   }));
+  app.get('/api/team/activity', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const t = await loadTeam(req.token, req.user, false);
+    if (!t || t.role !== 'owner') return fail(res, 403, 'Only the team owner can see activity.');
+    const r = await sb(`/rest/v1/activity?select=email,mode,client_label,redacted,created_at&team_id=eq.${t.id}&order=created_at.desc&limit=100`, req.token);
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not load activity. Did you run the activity SQL?'));
+    res.json({ activity: r.data || [] });
+  }));
   app.post('/api/team/invite-code', requireAuth, wrap(async (req, res) => {
     if (!need(req, res)) return;
     const t = await loadTeam(req.token, req.user, false);
@@ -470,7 +482,13 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
 
   const tags = Array.isArray(b.tags) ? b.tags.filter(t => TAG_KEYS.includes(t)) : [];
   if (mode === 'msg' && tags.length === 0) return fail(res, 400, 'Select at least one thing to redact.');
-  const custom = typeof b.custom === 'string' ? b.custom.trim().slice(0, MAX_NOTE) : '';
+  let custom = typeof b.custom === 'string' ? b.custom.trim().slice(0, MAX_NOTE) : '';
+  const lst = v => Array.isArray(v) ? [...new Set(v.filter(x => typeof x === 'string').map(x => x.trim().slice(0, 100)).filter(x => x.length >= 1))].slice(0, 40) : [];
+  const extra = lst(b.extra), keep = lst(b.keep);
+  if (mode !== 'reply') {
+    if (extra.length) custom = (custom ? custom + '\n' : '') + 'The reviewer also wants these exact words or phrases hidden everywhere: ' + extra.map(x => '"' + x + '"').join(', ');
+    if (keep.length) custom = (custom ? custom + '\n' : '') + 'The reviewer decided these may stay visible, so do NOT redact them (unless they are in the saved client list or company rules): ' + keep.map(x => '"' + x + '"').join(', ');
+  }
   const context = typeof b.context === 'string' ? b.context.trim().slice(0, MAX_NOTE) : '';
 
   const u = userLimit(req.user);
@@ -478,16 +496,18 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   const ip = ipLimit(req.ip);
   if (!ip.ok) return fail(res, 429, 'Too many requests from this network. Please wait and try again.');
 
-  let terms = [], rules = '';
+  let terms = [], rules = '', teamForLog = null, clientLabel = '';
   if (SB_ON) {
     let team;
     try { team = await loadTeam(req.token, req.user, false); } catch (e) { return fail(res, 502, 'Could not load your team: ' + e.message); }
     if (!team) return fail(res, 403, 'Create or join a team first.');
+    teamForLog = team;
     if (mode !== 'reply') rules = team.rules.slice(0, 2000);
     if (mode !== 'reply' && b.clientId) {
       if (!isUuid(b.clientId)) return fail(res, 400, 'Unknown client.');
-      const c = await sb(`/rest/v1/clients?select=terms&id=eq.${b.clientId}&team_id=eq.${team.id}`, req.token);
+      const c = await sb(`/rest/v1/clients?select=label,terms&id=eq.${b.clientId}&team_id=eq.${team.id}`, req.token);
       if (!c.ok || !c.data || !c.data[0]) return fail(res, 400, 'That client was not found in your team.');
+      clientLabel = String(c.data[0].label || '').slice(0, 60);
       terms = (c.data[0].terms || []).filter(t => typeof t === 'string' && t.trim().length >= 2).slice(0, 60);
     }
   } else if (mode !== 'reply' && Array.isArray(b.clientTerms)) {
@@ -519,6 +539,10 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
     const result = normalise(parsed);
     const fixed = scrubTerms(result, terms);
     if (fixed.length) result.leaks_fixed = fixed;
+    if (SB_ON && teamForLog) {
+      sb('/rest/v1/activity', req.token, { method: 'POST', prefer: 'return=minimal', body: { team_id: teamForLog.id, user_id: req.user, email: req.email, mode, client_label: clientLabel || null, redacted: Array.isArray(result.redacted_items) ? result.redacted_items.length : null } })
+        .then(r => { if (!r.ok) console.error('Activity log failed', r.status, JSON.stringify(r.data)); }).catch(e => console.error('Activity log error', e.message));
+    }
     return res.json({ result });
   } catch (err) {
     console.error('Proxy error:', err);

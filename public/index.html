@@ -441,6 +441,7 @@
           <button class="action-btn" onclick="downloadTxt()">.txt</button>
           <button class="action-btn" onclick="downloadPdf()">PDF</button>
           <button class="action-btn" onclick="downloadWord()">Word</button>
+          <button class="action-btn copy-primary" id="orig-btn" style="display:none" onclick="downloadOriginal()" title="Same look as your file, with pricing and sensitive items removed">Same-layout file</button>
           <button class="action-btn" id="review-btn" onclick="toggleReview()">Review details</button>
         </div>
       </div>
@@ -866,7 +867,7 @@ function chatCleanNow() {
   c.value=(c.value?c.value+'\n':'')+names.map(n=>n).join('\n'); // also hide the real speaker names if they appear inside messages
   scan(); toast('Chat cleaned: timestamps removed, names replaced with Person A, B…');
 }
-function onInput() { scan(); }
+function onInput() { if (!document.getElementById('msg-input').value.trim()) srcFile=null; scan(); }
 function onClientChange() { scan(); }
 function fillExample() {
   const ta=document.getElementById('msg-input');
@@ -905,7 +906,160 @@ async function readDocx(file) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
   return (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value.trim();
 }
+
+// ── SAME-LAYOUT EXPORT (keeps the original document's look; prices are always removed) ──
+let srcFile = null;
+const MONEY_RX = /(?:[$€£₹]\s?|\b(?:USD|AED|PKR|EUR|GBP|INR|Rs\.?)\s?)\d[\d,]*(?:\.\d+)?(?:\s?[kKmM]\b)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|AED|PKR|EUR|GBP|INR|dollars?|dirhams?|rupees?)\b|\b\d[\d,]*(?:\.\d+)?\s?(?:\/|per\s)\s?(?:hr|hour|day|week|month|mo|year|yr|project|word|page)\b/gi;
+const PRICE_KEY = /(?:\b(?:price|prices|pricing|cost|costs|fee|fees|rate|rates|budget|total|subtotal|amount|payment|payments|invoice|quote|quotation|salary|compensation|retainer|deposit|milestone|payout|charges?|billing|usd|aed|pkr|eur|gbp)\b|[$€£₹])/i;
+const NUM_RX = /[$€£₹]?(?:\d[\d,]*\.\d+|\d{1,3}(?:,\d{3})+|\d{3,})/g;
+const isYear = s => /^(19|20)\d\d$/.test(s);
+const STRONG_RX = /\b(?:pricing|prices?|invoices?|quote[ds]?|quotation|budget(?:ed)?|fees?|payments?|pay(?:s|ing|able)?|paid|upfront|up-front|retainer|deposit|salary|compensation|discounts?|charges?|charged|costs?|payout|rates?\s+of|hourly rate|per hour)\b/i;
+const MONEYSTYLE_RX = /\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+\.\d{2}\b/;
+function isPriceSentence(s) { MONEY_RX.lastIndex=0; const m=new RegExp(MONEY_RX.source,'i').test(s); return m || MONEYSTYLE_RX.test(s) || STRONG_RX.test(s) || (PRICE_KEY.test(s) && /\d/.test(s)); }
+const PRICE_HEADING = /^\s*(?:pricing|price|prices|payment(?:\s+terms)?|budget|fees?|costs?|commercials?|investment|quotation|quote|rates?|billing)\s*[:\-]?\s*$/i;
+function priceStrings(text) {
+  const out = new Set();
+  (text.match(MONEY_RX) || []).forEach(x=>out.add(x.trim()));
+  (text.match(/\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b|\b\d+\.\d{2}\b/g) || []).forEach(x=>out.add(x));
+  text.split('\n').forEach(l=>{ if (PRICE_KEY.test(l)) (l.match(NUM_RX)||[]).forEach(x=>{ if(!isYear(x)) out.add(x); }); });
+  return [...out];
+}
+function hideList() {
+  const set = new Set(((currentOutput && currentOutput.redacted_items) || []).map(r=>r.original).filter(x=>x && x.trim().length>=2));
+  const c = selectedClient(); if (c) (c.terms||[]).forEach(x=>{ if (x && x.length>=2) set.add(x); });
+  priceStrings(lastSource||'').forEach(x=>{ if (x.length>=2) set.add(x); });
+  return [...set].sort((a,b)=>b.length-a.length);
+}
+const GENERIC = { client_name:'the client', client:'the client', company:'their company', organization:'their company', project_name:'the project', project:'the project', location:'their location', address:'their location' };
+function tokenFor(orig) { const r=((currentOutput&&currentOutput.redacted_items)||[]).find(r=>r.original===orig); if (!r) return /\d/.test(orig) ? '' : 'the client';
+  const k=String(r.category||'').toLowerCase().trim().replace(/[\s\/-]+/g,'_'); return Object.prototype.hasOwnProperty.call(GENERIC,k) ? GENERIC[k] : ''; }
+function wsRx(list) { return new RegExp(list.map(x=>escRx(x.trim()).replace(/\s+/g,'\\s+')).join('|'),'gi'); }
+async function downloadOriginal() {
+  if (!srcFile || !currentOutput) return;
+  const list = hideList(); if (!list.length) { toast('Nothing to hide in this file'); return; }
+  const n = srcFile.name.toLowerCase(); toast('Building the file…', 20000);
+  try { if (n.endsWith('.pdf')) await redactPdf(srcFile, list); else if (n.endsWith('.docx')) await redactDocx(srcFile, list); }
+  catch (e) { console.error(e); toast('Could not build the file: ' + (e.message||e), 8000); }
+}
+function replaceInTs(ts, rx, tokFn) {
+  const offs=[]; let full=''; ts.forEach(t=>{ offs.push(full.length); full+=t.textContent; });
+  const ms=[]; let m; rx.lastIndex=0; while((m=rx.exec(full))) { if(!m[0].length){ rx.lastIndex++; continue; } ms.push([m.index,m.index+m[0].length,m[0]]); }
+  for (const [s,e,txt] of ms.reverse()) {
+    let tok=tokFn(txt); if (tok && (s===0 || /[.!?]\s*$/.test(full.slice(0,s)))) tok = tok.charAt(0).toUpperCase()+tok.slice(1); let first=true;
+    ts.forEach((t,i)=>{ const a=offs[i], b=a+t.textContent.length; if (b<=s||a>=e) return;
+      const ls=Math.max(s,a)-a, le=Math.min(e,b)-a, v=t.textContent;
+      t.textContent = v.slice(0,ls) + (first?tok:'') + v.slice(le); t.setAttribute('xml:space','preserve'); first=false; });
+  }
+  return ms.length;
+}
+function deleteRanges(ts, ranges) {
+  const offs=[]; let full=''; ts.forEach(t=>{ offs.push(full.length); full+=t.textContent; });
+  for (const [s,e] of ranges.slice().sort((a,b)=>b[0]-a[0])) {
+    ts.forEach((t,i)=>{ const a=offs[i], b=a+t.textContent.length; if (b<=s||a>=e) return; const ls=Math.max(s,a)-a, le=Math.min(e,b)-a, v=t.textContent; t.textContent=v.slice(0,ls)+v.slice(le); t.setAttribute('xml:space','preserve'); });
+  }
+}
+function removePricingDocx(doc) {
+  let n = 0; const ln = (el,name)=>Array.from(el.childNodes).filter(x=>x.localName===name);
+  const text = el => el.textContent;
+  // 1) tables: drop price columns and total/tax rows
+  for (const tbl of Array.from(doc.getElementsByTagNameNS('*','tbl'))) {
+    let rows = ln(tbl,'tr'); if (!rows.length) continue;
+    const hdr = ln(rows[0],'tc'); const cols = []; hdr.forEach((c,i)=>{ if (PRICE_KEY.test(text(c)) || STRONG_RX.test(text(c))) cols.push(i); });
+    if (cols.length === hdr.length && hdr.length) { tbl.parentNode.removeChild(tbl); n++; continue; }
+    rows.forEach((r,ri)=>{ const cs = ln(r,'tc'); const first = cs[0] ? text(cs[0]) : '';
+      const bad = ri>0 && (/^\s*(?:sub\s?-?total|grand total|total|tax|vat|gst|discount|amount due|balance|advance|deposit)\b/i.test(first) || cs.some((c,i)=>!cols.includes(i) && isPriceSentence(text(c)) && /\d/.test(text(c))));
+      if (bad) { tbl.removeChild(r); n++; return; }
+      cols.slice().sort((a,b)=>b-a).forEach(i=>{ if (cs[i]) { r.removeChild(cs[i]); n++; } });
+    });
+    const grid = ln(tbl,'tblGrid')[0]; if (grid) { const gc = ln(grid,'gridCol'); cols.slice().sort((a,b)=>b-a).forEach(i=>{ if (gc[i]) grid.removeChild(gc[i]); }); }
+    if (!ln(tbl,'tr').length) tbl.parentNode.removeChild(tbl);
+  }
+  // 2) paragraphs: delete whole sentences that talk about price or payment, then empty paragraphs and bare headings
+  for (const p of Array.from(doc.getElementsByTagNameNS('*','p'))) {
+    const ts = Array.from(p.getElementsByTagNameNS('*','t')); if (!ts.length) continue;
+    const full = ts.map(t=>t.textContent).join(''); const inCell = p.parentNode && p.parentNode.localName === 'tc';
+    const ranges = []; const rx = /[^\n]+?(?:[.!?]+(?=\s|$)|$)\s*/g; let m;
+    while ((m = rx.exec(full))) { if (!m[0].length) { rx.lastIndex++; continue; } if (isPriceSentence(m[0])) ranges.push([m.index, m.index+m[0].length]); }
+    if (ranges.length) { deleteRanges(ts, ranges); n += ranges.length; }
+    const left = ts.map(t=>t.textContent).join('').trim();
+    if (!inCell && p.parentNode && ((ranges.length && !left) || PRICE_HEADING.test(full))) { p.parentNode.removeChild(p); if (PRICE_HEADING.test(full)) n++; }
+  }
+  return n;
+}
+async function redactDocx(file, list) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  const zip = await JSZip.loadAsync(await file.arrayBuffer()); const rx = wsRx(list); let total = 0, left = 0;
+  const numRx = new RegExp(NUM_RX.source,'g'), money = new RegExp(MONEY_RX.source,'gi');
+  const norm = s => s.toLowerCase().replace(/\s+/g,' ');
+  const tokFn = txt => tokenFor(list.find(x=>norm(x)===norm(txt)) || txt);
+  const tsOf = el => Array.from(el.getElementsByTagNameNS('*','t'));
+  const numTok = txt => isYear(txt) ? txt : '';
+  for (const name of Object.keys(zip.files)) {
+    if (!/^word\/(document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml$/.test(name)) continue;
+    const doc = new DOMParser().parseFromString(await zip.file(name).async('string'), 'application/xml');
+    total += removePricingDocx(doc);
+    // leftovers: anything still price-like is replaced
+    for (const tbl of Array.from(doc.getElementsByTagNameNS('*','tbl'))) {
+      const rows = Array.from(tbl.childNodes).filter(n=>n.localName==='tr'); if (!rows.length) continue;
+      const cellsOf = r => Array.from(r.childNodes).filter(n=>n.localName==='tc');
+      const keyCols = new Set(); cellsOf(rows[0]).forEach((c,i)=>{ if (PRICE_KEY.test(c.textContent)) keyCols.add(i); });
+      rows.forEach((r,ri)=>{ const cs=cellsOf(r); const rowKey = ri>0 && cs.some(c=>PRICE_KEY.test(c.textContent));
+        cs.forEach((c,i)=>{ if ((ri>0 && keyCols.has(i)) || rowKey) total += replaceInTs(tsOf(c), numRx, numTok); }); });
+    }
+    for (const p of Array.from(doc.getElementsByTagNameNS('*','p'))) {
+      const ts = tsOf(p); if (!ts.length) continue;
+      const dropList = list.filter(x=>!tokenFor(x)); if (dropList.length) { const full0 = ts.map(t=>t.textContent).join(''), drx = wsRx(dropList), sr = /[^\n]+?(?:[.!?]+(?=\s|$)|$)\s*/g, rg = []; let sm; while ((sm = sr.exec(full0))) { if (!sm[0].length) { sr.lastIndex++; continue; } drx.lastIndex = 0; if (drx.test(sm[0])) rg.push([sm.index, sm.index+sm[0].length]); } if (rg.length) { deleteRanges(ts, rg); total += rg.length; } }
+      total += replaceInTs(ts, rx, tokFn);
+      const t2 = ts.map(t=>t.textContent).join(''); money.lastIndex = 0; if (money.test(t2)) left++;
+    }
+    zip.file(name, new XMLSerializer().serializeToString(doc));
+  }
+  const core = zip.file('docProps/core.xml');
+  if (core) zip.file('docProps/core.xml', (await core.async('string')).replace(/<(dc:creator|cp:lastModifiedBy)>[^<]*<\/\1>/g,'<$1></$1>'));
+  const blob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  saveBlob(blob, blob.type, file.name.replace(/\.docx$/i,'') + '-clean.docx');
+  toast(total ? `Done: pricing removed (${total} change${total>1?'s':''}), layout kept.` + (left ? ' A price-like value may remain, so search the file for $ once.' : '') : 'No matches found in the file layout. Use the text download instead.', 7000);
+}
+async function redactPdf(file, list) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise; const rx = wsRx(list);
+  const { jsPDF } = window.jspdf; let out = null, total = 0;
+  for (let pn=1; pn<=pdf.numPages; pn++) {
+    const page = await pdf.getPage(pn), v1 = page.getViewport({ scale:1 }), S = 1.6, vp = page.getViewport({ scale:S });
+    const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height; const ctx = cv.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const tc = await page.getTextContent(); const offs=[]; let full='';
+    tc.items.forEach(it=>{ offs.push(full.length); full += it.str; });
+    const ranges=[]; let m; rx.lastIndex=0;
+    while((m=rx.exec(full))) { if(!m[0].length){ rx.lastIndex++; continue; } ranges.push([m.index, m.index+m[0].length]); }
+    // lines that talk about price or payment are removed completely
+    const lines = {}; tc.items.forEach((it,i)=>{ if(!it.str.trim()) return; const k=Math.round(it.transform[5]/3); (lines[k]=lines[k]||[]).push(i); });
+    Object.values(lines).forEach(ix=>{ const txt=ix.map(i=>tc.items[i].str).join(' '); if (!isPriceSentence(txt)) return;
+      const srt=ix.slice().sort((p,q)=>tc.items[p].transform[4]-tc.items[q].transform[4]); const tableRow = srt.some((i,k)=>k && tc.items[i].transform[4]-(tc.items[srt[k-1]].transform[4]+tc.items[srt[k-1]].width) > 15);
+      (tableRow ? ix.filter(i=>isPriceSentence(tc.items[i].str)) : ix).forEach(i=>ranges.push([offs[i], offs[i]+tc.items[i].str.length])); });
+    // table columns: a short price-word heading hides the numeric-only cells beneath it
+    tc.items.forEach((hd,hi)=>{ const s=hd.str.trim(); if (!s || s.length>25 || !PRICE_KEY.test(s)) return; ranges.push([offs[hi], offs[hi]+hd.str.length]); const x0=hd.transform[4], x1=x0+hd.width, y0=hd.transform[5];
+      tc.items.forEach((it,i)=>{ if (it===hd || it.transform[5]>=y0-2 || !/^[\s$€£₹\d,.%]+$/.test(it.str) || !/\d/.test(it.str)) return; const a=it.transform[4], b=a+it.width; if (b>=x0-6 && a<=x1+6) ranges.push([offs[i], offs[i]+it.str.length]); }); });
+    total += ranges.length; ctx.fillStyle='#fff';
+    ranges.forEach(([s,e])=>{
+      tc.items.forEach((it,i)=>{ const a=offs[i], b=a+it.str.length; if (!it.str.length || b<=s || a>=e) return;
+        const ht=it.height||Math.abs(it.transform[3])||10, fam=(tc.styles[it.fontName]&&tc.styles[it.fontName].fontFamily)||'sans-serif';
+        ctx.save(); ctx.font = ht + 'px ' + fam; const tot = ctx.measureText(it.str).width || 1;
+        const f0 = ctx.measureText(it.str.slice(0, Math.max(s,a)-a)).width/tot, f1 = ctx.measureText(it.str.slice(0, Math.min(e,b)-a)).width/tot; ctx.restore(); ctx.fillStyle='#fff';
+        const x=it.transform[4], y=it.transform[5], w=it.width;
+        const [rx1,ry1,rx2,ry2]=vp.convertToViewportRectangle([x+w*f0-2.5, y-ht*0.25, x+w*f1+2.5, y+ht*1.0]);
+        ctx.fillRect(Math.min(rx1,rx2), Math.min(ry1,ry2), Math.abs(rx2-rx1), Math.abs(ry2-ry1)); }); });
+    const orient = v1.width > v1.height ? 'l' : 'p';
+    if (!out) out = new jsPDF({ orientation: orient, unit:'pt', format:[v1.width, v1.height], compress:true });
+    else out.addPage([v1.width, v1.height], orient);
+    out.addImage(cv.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, v1.width, v1.height);
+  }
+  out.save(file.name.replace(/\.pdf$/i,'') + '-redacted.pdf');
+  toast(total ? `Done: pricing lines and columns erased (${total}). A PDF can't reflow, so small blank gaps stay where they were. Send the Word version if you need no gaps.` : 'No matches found on the pages. Use the text download instead.', 8000);
+}
 async function loadDocFile(file) {
+  srcFile = null;
   if (file.size > 15*1024*1024) { toast('That file is over 15 MB'); return; }
   toast('Reading ' + file.name + '…', 8000);
   try {
@@ -919,7 +1073,7 @@ async function loadDocFile(file) {
     }
     const MAX = 12000, cut = t.length > MAX;
     if (cut) t = t.slice(0, MAX);
-    removeImage(); document.getElementById('msg-input').value = t; scan();
+    removeImage(); document.getElementById('msg-input').value = t; srcFile = /\.(pdf|docx)$/i.test(n) ? file : null; scan();
     toast(cut ? 'File is long, so only the first 12,000 characters were loaded. Split it and run the rest separately.' : 'File loaded. Review it, then press Declassify.', cut ? 9000 : 3500);
   } catch (e) { console.error(e); toast(e.message || 'Could not read that file', 8000); }
 }
@@ -1125,6 +1279,7 @@ function renderOutput(d) {
   const reply = d._mode==='reply';
   document.getElementById('review').classList.remove('open');
   document.getElementById('review-btn').style.display = (reply || !lastSource) ? 'none' : '';
+  document.getElementById('orig-btn').style.display = (!reply && srcFile && document.getElementById('msg-input').value.trim() ? '' : 'none');
   document.getElementById('more-details').style.display = reply ? 'none' : '';
   if (reply) { document.getElementById('sensitivity-badge').className='status-badge status-low'; document.getElementById('sensitivity-badge').textContent='Reply draft'; document.getElementById('redact-count').textContent=''; document.getElementById('clean-label').textContent='✅ Reply for your client'; document.getElementById('leak-box').style.display='none'; document.getElementById('risk-box').style.display='none'; document.getElementById('ask-box').style.display='none'; }
   document.getElementById('output-wrap').classList.add('show');

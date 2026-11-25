@@ -378,7 +378,7 @@
       Confidential message declassifier
     </div>
     <h1>What do you want to <span>hide?</span></h1>
-    <p>Paste a message, drop a screenshot, or press Ctrl+V anywhere. Sensitive details light up before you send.</p>
+    <p>Paste a message, drop a PDF, Word file or screenshot, or press Ctrl+V anywhere. Sensitive details light up before you send.</p>
   </div>
 
   <div class="bar" id="cmd-bar">
@@ -400,7 +400,7 @@
         <span class="sep"></span>
         <label class="chip" title="Saved client: their details are always hidden">👤 <select id="vault-select" onchange="onClientChange()" aria-label="Saved client"></select></label>
         <button class="chip" id="strict-chip" onclick="toggleStrict()" title="Also hide anything a freelancer could search for">🛡 Anti-poaching</button>
-        <button class="chip" onclick="document.getElementById('file-input').click()">📎 Screenshot</button>
+        <button class="chip" onclick="document.getElementById('file-input').click()" title="PDF, Word, text file or screenshot">📎 File</button>
         <button class="chip" id="opts-chip" onclick="toggleOpts()">⚙ Options</button>
       </div>
       <div class="runwrap"><span class="kbds">Ctrl ⏎</span>
@@ -408,7 +408,7 @@
       </div>
     </div>
     <input type="checkbox" id="strict-on" class="sr-only" tabindex="-1" aria-hidden="true" />
-    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="handleImage(event)" />
+    <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md,.csv,image/png,image/jpeg,image/webp,image/gif" style="display:none" onchange="handleImage(event)" />
 
     <div class="opts-panel" id="opts-panel">
       <div id="tags-wrap"><div class="lbl">Hide these</div><div class="tags-grid" id="tags-grid"></div></div>
@@ -889,14 +889,46 @@ function loadImageFile(file) {
   };
   reader.readAsDataURL(file);
 }
-function handleImage(e) { loadImageFile(e.target.files[0]); e.target.value=''; }
+
+// ── FILES (PDF, Word, text): text is read in your browser, the file itself is never uploaded ──
+function loadScript(src) { return new Promise((res,rej)=>{ if (document.querySelector('script[src="'+src+'"]')) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Could not load the file reader. Check your connection.')); document.head.appendChild(s); }); }
+async function readPdf(file) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise; let out = '';
+  for (let i=1;i<=pdf.numPages;i++) { const c=await (await pdf.getPage(i)).getTextContent(); let line='', y=null;
+    c.items.forEach(it=>{ const ny=it.transform[5]; if (y!==null && Math.abs(ny-y)>3) { out+=line.trim()+'\n'; line=''; } line+=it.str+(it.hasEOL?'\n':' '); y=ny; });
+    out+=line.trim()+'\n\n'; }
+  return out.replace(/\n{3,}/g,'\n\n').trim();
+}
+async function readDocx(file) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+  return (await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value.trim();
+}
+async function loadDocFile(file) {
+  if (file.size > 15*1024*1024) { toast('That file is over 15 MB'); return; }
+  toast('Reading ' + file.name + '…', 8000);
+  try {
+    const n = file.name.toLowerCase(); let t = '';
+    if (n.endsWith('.pdf')) t = await readPdf(file);
+    else if (n.endsWith('.docx')) t = await readDocx(file);
+    else t = (await file.text()).trim();
+    if (!t) { toast('No readable text found. If this is a scanned PDF, take a screenshot of the page and drop that in instead.', 9000); return; }
+    const MAX = 20000, cut = t.length > MAX;
+    if (cut) t = t.slice(0, MAX);
+    removeImage(); document.getElementById('msg-input').value = t; scan();
+    toast(cut ? 'File is long, so only the first 20,000 characters were loaded. Split it and run the rest separately.' : 'File loaded. Review it, then press Declassify.', cut ? 9000 : 3500);
+  } catch (e) { console.error(e); toast(e.message || 'Could not read that file', 8000); }
+}
+function loadAnyFile(f) { if (!f) return; if (/^image\//.test(f.type)) loadImageFile(f); else if (/\.(pdf|docx|txt|md|csv)$/i.test(f.name)) loadDocFile(f); else toast('Use a PDF, Word (.docx), text file or screenshot'); }
+function handleImage(e) { loadAnyFile(e.target.files[0]); e.target.value=''; }
 function removeImage() { imageBase64=null; imageMediaType=null; document.getElementById('shot-wrap').classList.remove('show'); }
 document.addEventListener('paste', e => {
   const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));
   if (it && document.getElementById('app-screen').classList.contains('visible')) { e.preventDefault(); loadImageFile(it.getAsFile()); }
 });
 document.addEventListener('dragover', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
-document.addEventListener('drop', e => { const f=e.dataTransfer&&e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) { e.preventDefault(); loadImageFile(f); } });
+document.addEventListener('drop', e => { const f=e.dataTransfer&&e.dataTransfer.files[0]; if (f && (f.type.startsWith('image/')||/\.(pdf|docx|txt|md|csv)$/i.test(f.name))) { e.preventDefault(); loadAnyFile(f); } });
 
 // ── CLIENT VAULT (stored only in this browser) ──
 let vault = []; let vaultEditing = null;

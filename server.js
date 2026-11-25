@@ -8,7 +8,7 @@ app.disable('x-powered-by');
 const PORT = process.env.PORT || 8080;
 const API_URL = process.env.ANTHROPIC_API_URL || 'https://api.anthropic.com/v1/messages';
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
-const MAX_TOKENS = 4000;
+const MAX_TOKENS = parseInt(process.env.MAX_TOKENS, 10) || 9000;
 
 // ───────────────────────── configuration ─────────────────────────
 const tidy = v => String(v || '').trim().replace(/^["']|["']$/g, '').trim();
@@ -45,7 +45,7 @@ const SESSION_DAYS = 7;
 
 const TAG_KEYS = ['client_name', 'budget', 'company', 'contact_info', 'location', 'dates', 'project_name', 'legal', 'personal_details'];
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-const MAX_TEXT = 20000;
+const MAX_TEXT = 12000;
 const MAX_IMAGE_B64 = 7000000; // about 5 MB of image data
 const MAX_NOTE = 1000;
 
@@ -252,11 +252,13 @@ ${context ? 'Context about the freelancer or team: ' + context : ''}${body}
 ${BRIEF_SCHEMA}`;
   }
   if (hasImage) {
-    return `Read all text in this image then declassify it. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso redact: ' + custom : ''}.
+    return `Read all text in this attached image or document then declassify it. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
 ${MSG_SCHEMA_IMAGE}`;
   }
+  const long = text.length > 3000;
+  const schema = long ? MSG_SCHEMA_TEXT.replace(/\n  "declassified_message": [^\n]*/, '') : MSG_SCHEMA_TEXT;
   return `Declassify this client message. Redact: ${tags.join(', ')}${strict ? POACH_RULES : ''}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso redact: ' + custom : ''}.
 ${context ? 'Team context: ' + context : ''}
 
@@ -265,7 +267,7 @@ Client message:
 ${text}
 """
 
-${MSG_SCHEMA_TEXT}`;
+${schema}`;
 }
 
 function parseModelJson(raw) {
@@ -317,7 +319,7 @@ async function callClaude(content) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, system: SYSTEM, messages: [{ role: 'user', content }] }),
-    signal: AbortSignal.timeout(110000),
+    signal: AbortSignal.timeout(150000),
   });
 }
 
@@ -476,8 +478,8 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   if ((text ? 1 : 0) + (img ? 1 : 0) !== 1) return fail(res, 400, 'Send either text or an image.');
   if (text.length > MAX_TEXT) return fail(res, 400, `Text is too long. The limit is ${MAX_TEXT.toLocaleString()} characters.`);
   if (img) {
-    if (!IMAGE_TYPES.includes(img.media_type)) return fail(res, 400, 'Unsupported image type. Use PNG, JPG, WEBP or GIF.');
-    if (typeof img.data !== 'string' || !img.data || img.data.length > MAX_IMAGE_B64 || /[^A-Za-z0-9+/=\s]/.test(img.data.slice(0, 2000))) return fail(res, 400, 'Image is missing, invalid or larger than 5 MB.');
+    if (!IMAGE_TYPES.includes(img.media_type) && img.media_type !== 'application/pdf') return fail(res, 400, 'Unsupported file type. Use PNG, JPG, WEBP, GIF or PDF.');
+    if (typeof img.data !== 'string' || !img.data || img.data.length > MAX_IMAGE_B64 || /[^A-Za-z0-9+/=\s]/.test(img.data.slice(0, 2000))) return fail(res, 400, 'The file is missing, invalid or larger than 5 MB.');
   }
 
   const tags = Array.isArray(b.tags) ? b.tags.filter(t => TAG_KEYS.includes(t)) : [];
@@ -517,7 +519,7 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   const tone = ['friendly', 'professional', 'brief'].includes(b.tone) ? { friendly: 'warm and friendly', professional: 'formal and professional', brief: 'very short and direct' }[b.tone] : 'professional but warm';
   const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true, rules });
   const content = img
-    ? [{ type: 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
+    ? [{ type: img.media_type === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];
 
   try {
@@ -529,7 +531,7 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
       const why = (data && data.error && data.error.message) || 'unknown error';
       return fail(res, 502, `AI service error (${r.status}): ${why}`);
     }
-    if (data.stop_reason === 'max_tokens') return fail(res, 502, 'The reply was cut off because the input is very long. Try a shorter text.');
+    if (data.stop_reason === 'max_tokens') return fail(res, 502, 'The reply was cut off because the input is very long. Try a shorter text or split the file in two.');
     const raw = (data.content || []).map(c => c.text || '').join('');
     const parsed = parseModelJson(raw);
     if (!parsed || typeof parsed !== 'object') {

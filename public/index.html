@@ -384,7 +384,7 @@
   <div class="bar" id="cmd-bar">
     <div class="shot" id="shot-wrap">
       <img id="img-preview" alt="Attached screenshot" />
-      <div><b>Screenshot attached</b><span>It will be read and cleaned.</span></div>
+      <div><b>File attached</b><span>It will be read and cleaned.</span></div>
       <button class="x-btn" onclick="removeImage()" aria-label="Remove screenshot">✕</button>
     </div>
     <div class="editor">
@@ -877,14 +877,14 @@ function fillExample() {
 }
 
 // ── SCREENSHOT ──
-function loadImageFile(file) {
-  if (!file || !/^image\//.test(file.type)) return;
+function loadImageFile(file, pdf) {
+  if (!file || (!pdf && !/^image\//.test(file.type))) return;
   if (file.size > 5*1024*1024) { toast('That image is over 5 MB'); return; }
-  imageMediaType = file.type;
+  imageMediaType = pdf ? 'application/pdf' : file.type;
   const reader = new FileReader();
   reader.onload = ev => {
     imageBase64 = ev.target.result.split(',')[1];
-    document.getElementById('img-preview').src = ev.target.result;
+    document.getElementById('img-preview').src = pdf ? 'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56"><rect width="56" height="56" rx="8" fill="#232a35"/><text x="28" y="34" font-size="15" font-family="sans-serif" fill="#8ab4ff" text-anchor="middle">PDF</text></svg>') : ev.target.result;
     document.getElementById('shot-wrap').classList.add('show');
   };
   reader.readAsDataURL(file);
@@ -913,11 +913,14 @@ async function loadDocFile(file) {
     if (n.endsWith('.pdf')) t = await readPdf(file);
     else if (n.endsWith('.docx')) t = await readDocx(file);
     else t = (await file.text()).trim();
-    if (!t) { toast('No readable text found. If this is a scanned PDF, take a screenshot of the page and drop that in instead.', 9000); return; }
-    const MAX = 20000, cut = t.length > MAX;
+    if (!t) {
+      if (n.endsWith('.pdf') && file.size <= 5*1024*1024) { await loadImageFile(file, true); toast('Scanned PDF: no text found, so the PDF itself will be sent to the AI to read. Press Declassify.', 8000); return; }
+      toast('No readable text found, or the scan is over 5 MB. Try a screenshot of the page instead.', 9000); return;
+    }
+    const MAX = 12000, cut = t.length > MAX;
     if (cut) t = t.slice(0, MAX);
     removeImage(); document.getElementById('msg-input').value = t; scan();
-    toast(cut ? 'File is long, so only the first 20,000 characters were loaded. Split it and run the rest separately.' : 'File loaded. Review it, then press Declassify.', cut ? 9000 : 3500);
+    toast(cut ? 'File is long, so only the first 12,000 characters were loaded. Split it and run the rest separately.' : 'File loaded. Review it, then press Declassify.', cut ? 9000 : 3500);
   } catch (e) { console.error(e); toast(e.message || 'Could not read that file', 8000); }
 }
 function loadAnyFile(f) { if (!f) return; if (/^image\//.test(f.type)) loadImageFile(f); else if (/\.(pdf|docx|txt|md|csv)$/i.test(f.name)) loadDocFile(f); else toast('Use a PDF, Word (.docx), text file or screenshot'); }
@@ -1025,7 +1028,7 @@ async function runAgent(opts) {
   const wk = document.getElementById('working'); wk.classList.add('show'); wkStep(1);
   const t1 = setTimeout(()=>wkStep(2), 1500), t2 = setTimeout(()=>wkStep(3), 5000);
   try {
-    let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 120000); });
+    let timer; const timeout = new Promise((_,rej)=>{ timer = setTimeout(()=>rej(new Error('TIMEOUT')), 170000); });
     const res = await Promise.race([timeout, api('/api/declassify', { method:'POST', headers:jsonHdr, body: JSON.stringify(payload) })]);
     clearTimeout(timer);
     const rawText = await res.text(); let data;
@@ -1047,7 +1050,7 @@ async function runAgent(opts) {
     if (!lastSource && parsed.extracted_text) lastSource = parsed.extracted_text;
     currentOutput = parsed; renderOutput(parsed);
     if (mode!=='reply') saveHistory(parsed);
-  } catch(err) { console.error(err); toast(err.message==='TIMEOUT' ? 'Timed out after 2 minutes. The server may be waking up, so try again.' : 'Error: '+err.message); }
+  } catch(err) { console.error(err); toast(err.message==='TIMEOUT' ? 'Timed out after almost 3 minutes. The server may be waking up, so try again.' : 'Error: '+err.message); }
   finally { clearTimeout(t1); clearTimeout(t2); wk.classList.remove('show'); btn.disabled = false; lab.textContent = prev; }
 }
 

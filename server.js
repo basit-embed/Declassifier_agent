@@ -226,7 +226,30 @@ function rulesLine(rules) {
   return rules ? '\nCOMPANY RULES set by the account owner. Always follow these in addition to everything above: ' + rules : '';
 }
 
-function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict, rules }) {
+const PLAN_PERSONA = {
+  software: 'You are a senior software and web delivery lead with 15 years of experience shipping products. Plan around discovery, architecture, design, build in iterations, testing, deployment and handover.',
+  hardware: 'You are a senior hardware product engineer and program manager who has taken many electronics products from idea to production. Plan around requirements, architecture, component and supplier selection (bill of materials, lead times), schematic and PCB design, firmware, prototype builds, test and validation stages, certification (such as CE, FCC, UL, RoHS where relevant), tooling, pilot run and production handover, and call out long-lead items and supply risks.',
+};
+function planPrompt({ text, persona, audience, terms, rules, custom, context }) {
+  const team = audience === 'team';
+  return `${PLAN_PERSONA[persona] || PLAN_PERSONA.software}
+Write a development plan for the project described in the client's requirements below.
+STYLE: plain, human and practical, as an experienced person would write it for a colleague. No hype, no filler, no AI-sounding phrases. Use short paragraphs and simple bullet points.
+CONTENT: ${persona === 'hardware' ? 'Phases with goals, deliverables and what must be true to move on; a timeline in weeks; roles needed; key components or long-lead items; risks and how to reduce them; assumptions and open questions.' : 'Phases with goals and deliverables; a timeline in weeks; roles needed; tech approach; risks and how to reduce them; assumptions and open questions.'} Give effort and timeline only as ranges in weeks or person-days. NEVER give prices, costs, rates, budgets or any money amounts, and do not repeat any budget mentioned in the requirements. Do not invent facts the requirements do not state; put gaps under "Open questions".
+${team ? 'AUDIENCE: the internal or outsourced delivery team. They must not learn who the client is. Never use the client name, company name, product or brand names, contact details, locations or any identifying detail; refer to "the client". Generalise anything that could identify them.' : 'AUDIENCE: the client. Address them directly and keep a confident, professional tone. You may use their project details, but still no prices or money amounts.'}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso: ' + custom : ''}
+${context ? 'Extra instructions: ' + context : ''}
+FORMAT: plain text only. Start each section with a line beginning "## " (for example "## Overview", "## Phases", "## Timeline", "## Team", "## Risks", "## Open questions"). Use "- " for bullets. No other markdown, no bold, no tables.
+
+Client requirements:
+"""
+${text}
+"""
+
+Return ONLY this JSON (no markdown): { "clean_message": "the full plan as plain text" }`;
+}
+
+function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict, rules, persona, audience }) {
+  if (mode === 'plan') return planPrompt({ text, persona, audience, terms, rules, custom, context });
   if (mode === 'reply') {
     return `${REPLY_RULES}
 Tone: ${tone}.
@@ -394,6 +417,77 @@ function teamRoutes() {
     res.json({ ok: true });
   }));
 
+
+  // ── projects: saved, cleaned results (never original messages) ──
+  const PKINDS = ['msg', 'brief', 'reply', 'plan'];
+  const cleanName = v => String(v || '').trim().slice(0, 80);
+  const optUuid = v => (typeof v === 'string' && isUuid(v)) ? v : null;
+  app.get('/api/projects', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const t = await loadTeam(req.token, req.user, false); if (!t) return fail(res, 403, 'Create or join a team first.');
+    const r = await sb(`/rest/v1/projects?select=id,name,client_id,created_by,created_at&team_id=eq.${t.id}&order=created_at.desc&limit=200`, req.token);
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not load projects. Did you run the projects SQL?'));
+    res.json({ projects: r.data || [] });
+  }));
+  app.post('/api/projects', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    const t = await loadTeam(req.token, req.user, false); if (!t) return fail(res, 403, 'Create or join a team first.');
+    const name = cleanName(req.body && req.body.name); if (!name) return fail(res, 400, 'Give the project a name.');
+    const r = await sb('/rest/v1/projects', req.token, { method: 'POST', body: { team_id: t.id, name, client_id: optUuid(req.body && req.body.clientId), created_by: req.user }, prefer: 'return=representation' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not create the project.'));
+    res.json({ project: Array.isArray(r.data) ? r.data[0] : r.data });
+  }));
+  app.patch('/api/projects/:id', requireAuth, json, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id)) return fail(res, 400, 'Bad request.');
+    const body = {}; const b = req.body || {};
+    if ('name' in b) { body.name = cleanName(b.name); if (!body.name) return fail(res, 400, 'Give the project a name.'); }
+    if ('clientId' in b) body.client_id = optUuid(b.clientId);
+    if (!Object.keys(body).length) return fail(res, 400, 'Nothing to change.');
+    const r = await sb(`/rest/v1/projects?id=eq.${req.params.id}`, req.token, { method: 'PATCH', body, prefer: 'return=representation' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not update the project.'));
+    if (!r.data || !r.data[0]) return fail(res, 403, 'Only the team owner or the project creator can change it.');
+    res.json({ project: r.data[0] });
+  }));
+  app.delete('/api/projects/:id', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id)) return fail(res, 400, 'Bad request.');
+    const r = await sb(`/rest/v1/projects?id=eq.${req.params.id}`, req.token, { method: 'DELETE', prefer: 'return=representation' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not delete the project.'));
+    if (!r.data || !r.data[0]) return fail(res, 403, 'Only the team owner or the project creator can delete it.');
+    res.json({ ok: true });
+  }));
+  app.get('/api/projects/:id/items', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id)) return fail(res, 400, 'Bad request.');
+    const r = await sb(`/rest/v1/project_items?select=id,kind,title,content,meta,email,created_by,created_at&project_id=eq.${req.params.id}&order=created_at.desc&limit=200`, req.token);
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not load this project.'));
+    res.json({ items: r.data || [] });
+  }));
+  app.post('/api/projects/:id/items', requireAuth, express.json({ limit: '200kb' }), wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id)) return fail(res, 400, 'Bad request.');
+    const t = await loadTeam(req.token, req.user, false); if (!t) return fail(res, 403, 'Create or join a team first.');
+    const b = req.body || {};
+    if (!PKINDS.includes(b.kind)) return fail(res, 400, 'Unknown item type.');
+    const content = String(b.content || '').slice(0, 40000); if (!content.trim()) return fail(res, 400, 'Nothing to save.');
+    const m = b.meta && typeof b.meta === 'object' ? b.meta : {};
+    const meta = {};
+    for (const k of ['sensitivity', 'persona', 'audience']) if (typeof m[k] === 'string') meta[k] = m[k].slice(0, 20);
+    if (Number.isFinite(m.count)) meta.count = Math.max(0, Math.min(9999, Math.floor(m.count)));
+    const r = await sb('/rest/v1/project_items', req.token, { method: 'POST', prefer: 'return=representation', body: { project_id: req.params.id, team_id: t.id, kind: b.kind, title: String(b.title || '').slice(0, 120), content, meta, created_by: req.user, email: req.email } });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not save to the project.'));
+    res.json({ item: Array.isArray(r.data) ? r.data[0] : r.data });
+  }));
+  app.delete('/api/projects/:id/items/:iid', requireAuth, wrap(async (req, res) => {
+    if (!need(req, res)) return;
+    if (!isUuid(req.params.id) || !isUuid(req.params.iid)) return fail(res, 400, 'Bad request.');
+    const r = await sb(`/rest/v1/project_items?id=eq.${req.params.iid}&project_id=eq.${req.params.id}`, req.token, { method: 'DELETE', prefer: 'return=representation' });
+    if (!r.ok) return fail(res, 400, sbMsg(r, 'Could not delete that item.'));
+    if (!r.data || !r.data[0]) return fail(res, 403, 'Only the team owner or the person who saved it can delete it.');
+    res.json({ ok: true });
+  }));
+
   const cleanClient = body => {
     const label = String((body && body.label) || '').trim().slice(0, 60);
     const terms = [...new Set((Array.isArray(body && body.terms) ? body.terms : []).map(x => String(x).trim().slice(0, 100)).filter(Boolean))].slice(0, 60);
@@ -470,11 +564,11 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
 
   const b = req.body || {};
   const mode = b.mode;
-  if (mode !== 'msg' && mode !== 'brief' && mode !== 'reply') return fail(res, 400, 'Unknown mode.');
+  if (!['msg', 'brief', 'reply', 'plan'].includes(mode)) return fail(res, 400, 'Unknown mode.');
 
   const text = typeof b.text === 'string' ? b.text.trim() : '';
   const img = b.image && typeof b.image === 'object' ? b.image : null;
-  if (mode === 'reply' && img) return fail(res, 400, 'Paste the reply as text.');
+  if ((mode === 'reply' || mode === 'plan') && img) return fail(res, 400, 'Send this as text.');
   if ((text ? 1 : 0) + (img ? 1 : 0) !== 1) return fail(res, 400, 'Send either text or an image.');
   if (text.length > MAX_TEXT) return fail(res, 400, `Text is too long. The limit is ${MAX_TEXT.toLocaleString()} characters.`);
   if (img) {
@@ -517,7 +611,7 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   }
   const clientName = typeof b.clientName === 'string' ? b.clientName.trim().slice(0, 60) : '';
   const tone = ['friendly', 'professional', 'brief'].includes(b.tone) ? { friendly: 'warm and friendly', professional: 'formal and professional', brief: 'very short and direct' }[b.tone] : 'professional but warm';
-  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true, rules });
+  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true, rules, persona: b.persona === 'hardware' ? 'hardware' : 'software', audience: b.audience === 'client' ? 'client' : 'team' });
   const content = img
     ? [{ type: img.media_type === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];
@@ -539,7 +633,7 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
       return fail(res, 502, 'The AI reply could not be read. Please try again.');
     }
     const result = normalise(parsed);
-    const fixed = scrubTerms(result, terms);
+    const fixed = (mode === 'plan' && b.audience === 'client') ? [] : scrubTerms(result, terms);
     if (fixed.length) result.leaks_fixed = fixed;
     if (SB_ON && teamForLog) {
       sb('/rest/v1/activity', req.token, { method: 'POST', prefer: 'return=minimal', body: { team_id: teamForLog.id, user_id: req.user, email: req.email, mode, client_label: clientLabel || null, redacted: Array.isArray(result.redacted_items) ? result.redacted_items.length : null } })

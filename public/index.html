@@ -311,6 +311,34 @@
   .rv-add{display:flex;gap:6px;margin:10px 0}.rv-add input{flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13px;min-width:0}
   .rv-apply{width:100%;margin:0;padding:10px}
   .rv-note{font-size:12px;color:var(--text3);margin-top:8px;line-height:1.5}
+
+  .plan{margin-top:1.25rem;border:1px solid var(--border);border-radius:14px;background:var(--surface2);padding:14px}
+  .plan-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .plan-top b{font-size:14px}.plan-top span{font-size:12.5px;color:var(--text2)}
+  .plan-opts{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--border2);border-radius:99px;overflow:hidden}
+  .seg button{background:transparent;color:var(--text2);border:0;padding:7px 14px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
+  .seg button.on{background:var(--accent-dim);color:#9cc2ff}
+  .plan-out{display:none;margin-top:14px}.plan-out.show{display:block}
+  .plan-doc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-size:14.5px;line-height:1.7}
+  .plan-doc .ph{font-weight:700;font-size:15px;margin:16px 0 6px;color:var(--text)}.plan-doc .ph:first-child{margin-top:0}
+  .plan-doc p{margin:0 0 8px}.plan-doc ul{margin:0 0 8px 18px;padding:0}
+  .plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+  .projbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .projbar .chip select{max-width:260px}
+  .proj-hint{font-size:12px;color:var(--text3)}
+  .projnew{display:none;gap:8px;flex-wrap:wrap;margin:0 0 12px;align-items:center}
+  .projnew.open{display:flex}
+  .projnew input,.projnew select{background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px;min-width:0}
+  .projnew input{flex:1;min-width:180px}
+  .pi{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);cursor:pointer;margin-bottom:8px}
+  .pi:hover{border-color:rgba(79,142,247,.5)}
+  .pi b{font-size:13.5px;font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pi span{font-size:12px;color:var(--text3)}
+  .pi .kind{flex:none;font-size:11px;padding:2px 9px;border-radius:99px;border:1px solid var(--border2);color:var(--text2)}
+  .pv{border:1px solid rgba(79,142,247,.4);border-radius:14px;background:var(--surface2);padding:14px;margin-bottom:12px}
+  .pv-text{white-space:pre-wrap;font-size:14.5px;line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:10px 0}
   .history-section{margin-top:2rem}
   #vault-editor{position:fixed;z-index:950;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,92vw);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.25rem;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
   #vault-editor h3{font-size:15px;margin-bottom:10px}
@@ -381,6 +409,16 @@
     <p>Paste a message, drop a PDF, Word file or screenshot, or press Ctrl+V anywhere. Sensitive details light up before you send.</p>
   </div>
 
+  <div class="projbar" id="projbar">
+    <label class="chip" title="Group runs, dev plans and the saved client by project">📁 <select id="project-select" onchange="onProjectChange()" aria-label="Project"></select></label>
+    <span id="proj-actions" style="display:none"><button class="chip" onclick="projRename()">Rename</button> <button class="chip" onclick="projDelete()">Delete</button></span>
+    <span class="proj-hint" id="proj-hint"></span>
+  </div>
+  <div class="projnew" id="projnew">
+    <input id="projnew-name" maxlength="80" placeholder="Project name, e.g. Smart lock prototype" onkeydown="if(event.key==='Enter'){event.preventDefault();projCreate();}" />
+    <select id="projnew-client" aria-label="Saved client for this project"></select>
+    <button class="vault-btn" onclick="projCreate()">Create</button><button class="vault-btn" onclick="projNewClose()">Cancel</button>
+  </div>
   <div class="bar" id="cmd-bar">
     <div class="shot" id="shot-wrap">
       <img id="img-preview" alt="Attached screenshot" />
@@ -452,6 +490,20 @@
         <div class="message-box" id="output-clean" style="border-color:rgba(61,186,126,0.3);"></div>
         <div class="ask-box" id="ask-box" style="margin-top:1rem"><b>Ask your client before assigning (not part of the brief)</b><ul id="ask-list"></ul></div>
 
+        <div class="plan" id="plan-box">
+          <div class="plan-top"><div><b>Need a development plan for this?</b><br><span>It uses the message above, so there is nothing to paste again.</span></div></div>
+          <div class="plan-opts">
+            <div class="seg" id="plan-persona" role="group" aria-label="Specialist"><button class="on" data-v="software" onclick="planPick('persona',this)">Software / Web</button><button data-v="hardware" onclick="planPick('persona',this)">Hardware</button></div>
+            <div class="seg" id="plan-aud" role="group" aria-label="Audience"><button class="on" data-v="team" onclick="planPick('aud',this)">For my team (cleaned)</button><button data-v="client" onclick="planPick('aud',this)">For the client</button></div>
+            <button class="run-btn run" id="plan-btn" onclick="runPlan()" style="padding:9px 18px"><span id="plan-btn-label">Generate dev plan</span></button>
+          </div>
+          <div class="plan-out" id="plan-out">
+            <div class="plan-doc" id="plan-doc"></div>
+            <div class="plan-actions"><button class="action-btn copy-primary" id="plan-copy" onclick="planCopy()">Copy</button><button class="action-btn" onclick="planExport(downloadTxt)">.txt</button><button class="action-btn" onclick="planExport(downloadPdf)">PDF</button><button class="action-btn" onclick="planExport(downloadWord)">Word</button><button class="action-btn" onclick="runPlan()">Regenerate</button></div>
+            <div class="rv-note" id="plan-note"></div>
+          </div>
+        </div>
+
         <div class="review" id="review">
           <div class="rv-grid">
             <div><div class="output-section-label">Your original. Click a hidden item to keep it, or a green one to hide it again.</div><div class="rv-doc" id="rv-doc"></div></div>
@@ -482,6 +534,15 @@
     </div>
   </div>
 
+  <div class="history-section" id="proj-section" style="display:none">
+    <div class="history-title"><span id="proj-title">Project history</span></div>
+    <div class="pv" id="pv" style="display:none">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><b id="pv-title" style="font-size:14px"></b><button class="x-btn" onclick="pvClose()" aria-label="Close">✕</button></div>
+      <div class="pv-text" id="pv-text"></div>
+      <div class="plan-actions"><button class="action-btn copy-primary" id="pv-copy" onclick="pvCopy()">Copy</button><button class="action-btn" onclick="pvExport(downloadTxt)">.txt</button><button class="action-btn" onclick="pvExport(downloadPdf)">PDF</button><button class="action-btn" onclick="pvExport(downloadWord)">Word</button><button class="action-btn" onclick="pvDelete()">Delete</button></div>
+    </div>
+    <div id="proj-list"></div>
+  </div>
   <div class="history-section" id="history-section" style="display:none">
     <div class="history-title">Recent sessions <button class="history-clear" onclick="clearHistory()">Clear all</button></div>
     <div class="history-list" id="history-list"></div>
@@ -681,7 +742,7 @@ function renderTeam() {
     <div style="display:flex;justify-content:space-between;margin-top:1.25rem"><button class="vault-btn" onclick="doLogout()">Sign out</button><button class="vault-btn" onclick="closeTeam()">Close</button></div>`;
   if (owner) loadActivity();
 }
-const MODE_NAME = { msg: 'Message', brief: 'Upwork brief', reply: 'Reply' };
+const MODE_NAME = { msg: 'Message', brief: 'Upwork brief', reply: 'Reply', plan: 'Dev plan' };
 async function loadActivity() {
   const box = document.getElementById('team-activity'); if (!box) return;
   const r = await api('/api/team/activity'); const d = await r.json().catch(()=>({}));
@@ -747,6 +808,7 @@ function showApp() {
   loadHistory();
   vaultLoad();
   applyTeamUi();
+  loadProjects();
   try { document.getElementById('strict-on').checked = localStorage.getItem('cp_strict')==='1'; } catch(e) {}
   syncStrict(); setMode(mode);
 }
@@ -868,7 +930,7 @@ function chatCleanNow() {
   scan(); toast('Chat cleaned: timestamps removed, names replaced with Person A, B…');
 }
 function onInput() { if (!document.getElementById('msg-input').value.trim()) srcFile=null; scan(); }
-function onClientChange() { scan(); }
+function onClientChange() { scan(); if (PROJ.active) projectLinkClient(); }
 function fillExample() {
   const ta=document.getElementById('msg-input');
   ta.value = mode==='brief'
@@ -1150,6 +1212,101 @@ function vaultRestore(e) {
   r.readAsText(f); e.target.value = '';
 }
 
+
+// ── PROJECTS (saved cleaned results; originals are never stored) ──
+let PROJ = { list: [], active: '', items: [], viewing: null };
+const PK = { msg:'Message', brief:'Brief', reply:'Reply', plan:'Dev plan' };
+const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e) { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { toast('Could not save in this browser'); } };
+const newId = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+async function pcall(path, opts) { const r = await api(path, opts); const d = await r.json().catch(()=>({})); if (!r.ok) throw new Error((d.error && d.error.message) || ('Server error ('+r.status+')')); return d; }
+const PStore = {
+  async list() { if (teamMode) return (await pcall('/api/projects')).projects.map(p=>({ id:p.id, name:p.name, clientId:p.client_id||'', by:p.created_by })); return lsGet('cp_projects', []); },
+  async create(name, clientId) { if (teamMode) { const p=(await pcall('/api/projects',{method:'POST',headers:jsonHdr,body:JSON.stringify({name,clientId:clientId||null})})).project; return { id:p.id, name:p.name, clientId:p.client_id||'' }; }
+    const p={ id:newId(), name, clientId:clientId||'' }; lsSet('cp_projects',[p,...lsGet('cp_projects',[])]); return p; },
+  async update(id, patch) { if (teamMode) { await pcall('/api/projects/'+encodeURIComponent(id),{method:'PATCH',headers:jsonHdr,body:JSON.stringify(patch)}); return; }
+    lsSet('cp_projects', lsGet('cp_projects',[]).map(p=>p.id===id?{...p,...patch}:p)); },
+  async remove(id) { if (teamMode) { await pcall('/api/projects/'+encodeURIComponent(id),{method:'DELETE'}); return; } lsSet('cp_projects', lsGet('cp_projects',[]).filter(p=>p.id!==id)); try{localStorage.removeItem('cp_pi_'+id);}catch(e){} },
+  async items(id) { if (teamMode) return (await pcall('/api/projects/'+encodeURIComponent(id)+'/items')).items.map(x=>({ id:x.id, kind:x.kind, title:x.title, content:x.content, meta:x.meta||{}, who:(x.email||'').split('@')[0], at:x.created_at })); return lsGet('cp_pi_'+id, []); },
+  async add(id, it) { if (teamMode) { const x=(await pcall('/api/projects/'+encodeURIComponent(id)+'/items',{method:'POST',headers:jsonHdr,body:JSON.stringify(it)})).item; return { id:x.id, kind:x.kind, title:x.title, content:x.content, meta:x.meta||{}, who:(x.email||'').split('@')[0], at:x.created_at }; }
+    const x={ id:newId(), ...it, who:'', at:new Date().toISOString() }; lsSet('cp_pi_'+id,[x,...lsGet('cp_pi_'+id,[])].slice(0,300)); return x; },
+  async del(id, iid) { if (teamMode) { await pcall('/api/projects/'+encodeURIComponent(id)+'/items/'+encodeURIComponent(iid),{method:'DELETE'}); return; } lsSet('cp_pi_'+id, lsGet('cp_pi_'+id,[]).filter(x=>x.id!==iid)); },
+};
+async function loadProjects() {
+  try { PROJ.list = await PStore.list(); } catch(e) { PROJ.list = []; toast(e.message, 7000); }
+  let want = ''; try { want = localStorage.getItem('cp_project') || ''; } catch(e) {}
+  PROJ.active = PROJ.list.some(p=>p.id===want) ? want : '';
+  renderProjectSelect(); if (PROJ.active) await openProject(PROJ.active, true);
+}
+function renderProjectSelect() {
+  const sel = document.getElementById('project-select');
+  sel.innerHTML = '<option value="">No project</option>' + PROJ.list.map(p=>`<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('') + '<option value="__new">+ New project…</option>';
+  sel.value = PROJ.active || '';
+  document.getElementById('proj-actions').style.display = PROJ.active ? '' : 'none';
+  const p = PROJ.list.find(x=>x.id===PROJ.active);
+  document.getElementById('proj-hint').textContent = p ? 'Every run and dev plan is saved here (cleaned text only).' : 'Optional: group your work by project.';
+}
+function onProjectChange() {
+  const v = document.getElementById('project-select').value;
+  if (v === '__new') { projNewOpen(); document.getElementById('project-select').value = PROJ.active || ''; return; }
+  PROJ.active = v; try { localStorage.setItem('cp_project', v); } catch(e) {}
+  renderProjectSelect(); if (v) openProject(v); else { PROJ.items = []; renderProjectItems(); renderHistory(); }
+}
+async function openProject(id, quiet) {
+  const p = PROJ.list.find(x=>x.id===id); if (!p) return;
+  if (p.clientId && vault.some(c=>c.id===p.clientId)) { document.getElementById('vault-select').value = p.clientId; scan(); }
+  try { PROJ.items = await PStore.items(id); } catch(e) { PROJ.items = []; toast(e.message, 7000); }
+  renderProjectItems(); renderHistory();
+}
+function projNewOpen() {
+  const sel = document.getElementById('projnew-client');
+  sel.innerHTML = '<option value="">No saved client</option>' + vault.map(c=>`<option value="${escHtml(c.id)}">${escHtml(c.name||c.label)}</option>`).join('');
+  const cur = document.getElementById('vault-select').value; if (cur) sel.value = cur;
+  document.getElementById('projnew').classList.add('open'); document.getElementById('projnew-name').focus();
+}
+function projNewClose() { document.getElementById('projnew').classList.remove('open'); document.getElementById('projnew-name').value=''; }
+async function projCreate() {
+  const name = document.getElementById('projnew-name').value.trim(); if (!name) { toast('Give the project a name'); return; }
+  try { const p = await PStore.create(name, document.getElementById('projnew-client').value); PROJ.list.unshift(p); PROJ.active = p.id; try{localStorage.setItem('cp_project',p.id);}catch(e){}
+    projNewClose(); renderProjectSelect(); await openProject(p.id); toast('Project created'); } catch(e) { toast(e.message, 7000); }
+}
+async function projRename() {
+  const p = PROJ.list.find(x=>x.id===PROJ.active); if (!p) return; const n = prompt('Project name', p.name); if (!n || !n.trim()) return;
+  try { await PStore.update(p.id, { name: n.trim().slice(0,80) }); p.name = n.trim().slice(0,80); renderProjectSelect(); renderProjectItems(); } catch(e) { toast(e.message, 7000); }
+}
+async function projDelete() {
+  const p = PROJ.list.find(x=>x.id===PROJ.active); if (!p || !confirm('Delete "' + p.name + '" and everything saved in it?')) return;
+  try { await PStore.remove(p.id); PROJ.list = PROJ.list.filter(x=>x.id!==p.id); PROJ.active=''; PROJ.items=[]; try{localStorage.setItem('cp_project','');}catch(e){} renderProjectSelect(); renderProjectItems(); renderHistory(); toast('Project deleted'); } catch(e) { toast(e.message, 7000); }
+}
+async function projectLinkClient() {
+  const p = PROJ.list.find(x=>x.id===PROJ.active); if (!p) return; const cid = document.getElementById('vault-select').value;
+  if ((p.clientId||'') === cid) return;
+  try { await PStore.update(p.id, { clientId: cid || null }); p.clientId = cid; toast(cid ? 'Client linked to this project' : 'Client unlinked from this project'); } catch(e) { toast(e.message, 7000); }
+}
+async function saveToProject(kind, title, content, meta) {
+  if (!PROJ.active || !content || !content.trim()) return;
+  try { const x = await PStore.add(PROJ.active, { kind, title: title.slice(0,120), content, meta: meta||{} }); PROJ.items.unshift(x); renderProjectItems();
+    const p = PROJ.list.find(q=>q.id===PROJ.active); toast('Saved to ' + (p?p.name:'project')); } catch(e) { toast('Could not save to the project: ' + e.message, 7000); }
+}
+function ago(iso) { try { return new Date(iso).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }); } catch(e) { return ''; } }
+function renderProjectItems() {
+  const sec = document.getElementById('proj-section'), p = PROJ.list.find(x=>x.id===PROJ.active);
+  if (!p) { sec.style.display='none'; return; }
+  sec.style.display = 'block'; document.getElementById('proj-title').textContent = p.name + ' · history';
+  document.getElementById('proj-list').innerHTML = PROJ.items.length ? PROJ.items.map(x=>`<div class="pi" onclick="pvOpen('${escHtml(x.id)}')"><div style="min-width:0"><b>${escHtml(x.title||'Untitled')}</b><span>${x.who?escHtml(x.who)+' · ':''}${ago(x.at)}</span></div><span class="kind">${PK[x.kind]||x.kind}</span></div>`).join('')
+    : '<div class="empty-state" style="padding:1.5rem">Nothing saved here yet. Run a message or generate a dev plan and it lands here automatically.</div>';
+}
+function pvOpen(id) { const x = PROJ.items.find(i=>i.id===id); if (!x) return; PROJ.viewing = x;
+  document.getElementById('pv-title').textContent = x.title || 'Untitled';
+  const t = document.getElementById('pv-text'); if (x.kind==='plan') t.innerHTML = planHtml(x.content); else t.textContent = x.content;
+  t.style.whiteSpace = x.kind==='plan' ? 'normal' : 'pre-wrap'; t.classList.toggle('plan-doc', x.kind==='plan');
+  document.getElementById('pv').style.display='block'; document.getElementById('pv').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function pvClose() { document.getElementById('pv').style.display='none'; PROJ.viewing=null; }
+function pvCopy() { if (!PROJ.viewing) return; navigator.clipboard.writeText(PROJ.viewing.content.replace(/^##\s+/gm,'')).then(()=>{ toast('Copied'); }, ()=>toast('Select the text and copy it')); }
+function pvExport(fn) { const x = PROJ.viewing; if (!x) return; const prev=currentOutput; currentOutput={ clean_message:x.content, _mode:x.kind==='plan'?'plan':(x.kind==='brief'?'brief':'msg') }; try { fn(); } finally { currentOutput=prev; } }
+async function pvDelete() { const x = PROJ.viewing; if (!x || !confirm('Delete this saved item?')) return;
+  try { await PStore.del(PROJ.active, x.id); PROJ.items = PROJ.items.filter(i=>i.id!==x.id); pvClose(); renderProjectItems(); } catch(e) { toast(e.message, 7000); } }
+
 // ── RUN ──
 function wkStep(n){ [1,2,3].forEach(i=>{ const e=document.getElementById('wk'+i); e.className = i<n?'done':i===n?'cur':''; }); }
 async function runAgent(opts) {
@@ -1204,9 +1361,46 @@ async function runAgent(opts) {
     if (!lastSource && parsed.extracted_text) lastSource = parsed.extracted_text;
     currentOutput = parsed; renderOutput(parsed);
     if (mode!=='reply') saveHistory(parsed);
+    const body = (parsed.clean_message || parsed.declassified_message || '');
+    saveToProject(mode, (mode==='reply' ? 'Reply: ' : '') + (body.split('\n').find(l=>l.trim()) || 'Untitled').trim().slice(0,90), body, { sensitivity: parsed.sensitivity_level, count: (parsed.redacted_items||[]).length });
   } catch(err) { console.error(err); toast(err.message==='TIMEOUT' ? 'Timed out after almost 3 minutes. The server may be waking up, so try again.' : 'Error: '+err.message); }
   finally { clearTimeout(t1); clearTimeout(t2); wk.classList.remove('show'); btn.disabled = false; lab.textContent = prev; }
 }
+
+
+// ── DEV PLAN (uses the same message as context) ──
+let planOpt = { persona:'software', aud:'team' }, planText = '';
+function planPick(k, btn) { planOpt[k]=btn.dataset.v; btn.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn)); }
+function planHtml(t) {
+  let out='', ul=false; const close=()=>{ if(ul){ out+='</ul>'; ul=false; } };
+  t.split(/\r?\n/).forEach(raw=>{ const l=raw.trim(); if(!l){ close(); return; }
+    if (/^##\s+/.test(l)) { close(); out+=`<div class="ph">${escHtml(l.replace(/^##\s+/,''))}</div>`; }
+    else if (/^[-•*]\s+/.test(l)) { if(!ul){ out+='<ul>'; ul=true; } out+=`<li>${escHtml(l.replace(/^[-•*]\s+/,''))}</li>`; }
+    else { close(); out+=`<p>${escHtml(l)}</p>`; } });
+  close(); return out;
+}
+async function runPlan() {
+  if (!lastSource) { toast('The original message is not available. Paste it again and run Declassify first.', 6000); return; }
+  const btn=document.getElementById('plan-btn'), lab=document.getElementById('plan-btn-label'); btn.disabled=true; lab.textContent='Writing the plan… up to a minute';
+  const payload = { mode:'plan', text:lastSource.slice(0,12000), persona:planOpt.persona, audience:planOpt.aud, tags:[],
+    custom: document.getElementById('custom-rules').value.trim(), context: document.getElementById('team-context').value.trim(),
+    clientTerms: vaultTerms(), clientId: teamMode ? document.getElementById('vault-select').value : '' };
+  try {
+    let timer; const timeout = new Promise((_,rej)=>{ timer=setTimeout(()=>rej(new Error('TIMEOUT')),170000); });
+    const res = await Promise.race([timeout, api('/api/declassify', { method:'POST', headers:jsonHdr, body:JSON.stringify(payload) })]); clearTimeout(timer);
+    const raw = await res.text(); let data; try { data = JSON.parse(raw); } catch(e) { toast('The server sent back a web page instead of data. It may be starting up, so try again in a minute.', 9000); return; }
+    if (res.status === 401) { sessionExpired(); return; }
+    if (data.error || !res.ok) { const m=data.error&&(data.error.message||data.error); toast(m||('Server error ('+res.status+')'), 9000); return; }
+    planText = data.result.clean_message || '';
+    document.getElementById('plan-doc').innerHTML = planHtml(planText);
+    document.getElementById('plan-note').textContent = (planOpt.aud==='team' ? 'Team version: client name, company, prices and contact details are removed. ' : 'Client version: no prices are included. ') + 'This is a draft. Check timelines before you send it.';
+    document.getElementById('plan-out').classList.add('show');
+    saveToProject('plan', 'Dev plan · ' + (planOpt.persona==='hardware'?'Hardware':'Software') + ' · ' + (planOpt.aud==='team'?'team version':'client version'), planText, { persona: planOpt.persona, audience: planOpt.aud });
+  } catch(err) { toast(err.message==='TIMEOUT' ? 'Timed out. Please try again.' : 'Error: '+err.message); }
+  finally { btn.disabled=false; lab.textContent='Generate dev plan'; }
+}
+function planCopy() { navigator.clipboard.writeText(planText.replace(/^##\s+/gm,'')).then(()=>{ const b=document.getElementById('plan-copy'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',2000); toast('Copied'); }, ()=>toast('Select the text and copy it')); }
+function planExport(fn) { if (!planText) return; const prev=currentOutput; currentOutput={ clean_message:planText, _mode:'plan' }; try { fn(); } finally { currentOutput=prev; } }
 
 // ── REVIEW (F) ──
 let rv = { items: [], keep: new Set(), extra: [], dirty: false };
@@ -1278,6 +1472,7 @@ function renderOutput(d) {
   }
   const reply = d._mode==='reply';
   document.getElementById('review').classList.remove('open');
+  document.getElementById('plan-box').style.display = (reply || !lastSource) ? 'none' : ''; document.getElementById('plan-out').classList.remove('show'); planText='';
   document.getElementById('review-btn').style.display = (reply || !lastSource) ? 'none' : '';
   document.getElementById('orig-btn').style.display = (!reply && srcFile && document.getElementById('msg-input').value.trim() ? '' : 'none');
   document.getElementById('more-details').style.display = reply ? 'none' : '';
@@ -1306,7 +1501,8 @@ function exportParts() {
     const l = line.trim();
     if (!l) { if (blocks.length && blocks[blocks.length-1].t !== 'gap') blocks.push({ t:'gap' }); return; }
     const bare = l.replace(/:$/, '');
-    if (isBrief && HEAD.test(bare)) blocks.push({ t:'h', text: bare });
+    if (/^##\s+/.test(l)) blocks.push({ t:'h', text: l.replace(/^##\s+/, '') });
+    else if (isBrief && HEAD.test(bare)) blocks.push({ t:'h', text: bare });
     else if (/^[-•*]\s+/.test(l)) blocks.push({ t:'b', text: l.replace(/^[-•*]\s+/, '') });
     else blocks.push({ t:'p', text: l });
   });
@@ -1318,7 +1514,7 @@ function saveBlob(content, type, name) {
   const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   URL.revokeObjectURL(url);
 }
-function fileStem() { return (currentOutput && currentOutput._mode === 'brief' ? 'brief-' : 'message-') + new Date().toISOString().slice(0,10); }
+function fileStem() { return (currentOutput && currentOutput._mode === 'plan' ? 'dev-plan-' : currentOutput && currentOutput._mode === 'brief' ? 'brief-' : 'message-') + new Date().toISOString().slice(0,10); }
 
 function downloadTxt() {
   const d = exportParts(); if (!d) return;
@@ -1391,7 +1587,7 @@ function renderHistory() {
   const sec = document.getElementById('history-section');
   const list = document.getElementById('history-list');
   document.getElementById('history-count').textContent = history.length+' processed';
-  if (!history.length) { sec.style.display='none'; return; }
+  if (!history.length || PROJ.active) { sec.style.display='none'; return; }
   sec.style.display='block';
   const lvl = { low:'status-low', medium:'status-medium', high:'status-high' };
   list.innerHTML = history.map(h=>`

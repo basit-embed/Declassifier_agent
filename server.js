@@ -230,17 +230,41 @@ const PLAN_PERSONA = {
   software: 'You are a senior software and web delivery lead with 15 years of experience shipping products. Plan around discovery, architecture, design, build in iterations, testing, deployment and handover.',
   hardware: 'You are a senior hardware product engineer and program manager who has taken many electronics products from idea to production. Plan around requirements, architecture, component and supplier selection (bill of materials, lead times), schematic and PCB design, firmware, prototype builds, test and validation stages, certification (such as CE, FCC, UL, RoHS where relevant), tooling, pilot run and production handover, and call out long-lead items and supply risks.',
 };
-function planPrompt({ text, persona, audience, terms, rules, custom, context }) {
+const PLAN_SECTIONS = {
+  objectives: ['Objectives', 'what the project must achieve and how success is measured'],
+  scope: ['Scope and deliverables', 'what is included, what is not, and the concrete deliverables'],
+  phases: ['Phases', 'phases with goals, activities and exit criteria'],
+  timeline: ['Timeline', 'a week-by-week or phase-by-phase schedule as ranges in weeks, with key milestones'],
+  team: ['Team and roles', 'the roles needed, how many people, and rough time commitment'],
+  costing: ['Costing', 'cost estimate'],
+  risks: ['Risks', 'the main risks and how to reduce each'],
+  assumptions: ['Assumptions and open questions', 'assumptions made and questions the client must answer'],
+  components: ['Components and suppliers', 'key components, long-lead items, suppliers and sourcing risks'],
+  certification: ['Testing and certification', 'validation tests and the certifications that may apply (such as CE, FCC, UL, RoHS)'],
+};
+const PLAN_DEFAULTS = ['objectives', 'scope', 'phases', 'timeline', 'team', 'risks', 'assumptions'];
+const CURRENCIES = ['USD', 'AED', 'PKR', 'EUR', 'GBP', 'INR'];
+function planPrompt({ text, persona, audience, terms, rules, custom, context, sections, currency }) {
   const team = audience === 'team';
+  const keys = (sections || []).filter(k => PLAN_SECTIONS[k] && (persona === 'hardware' || !['components', 'certification'].includes(k)) && !(team && k === 'costing'));
+  const use = keys.length ? keys : PLAN_DEFAULTS;
+  const costing = use.includes('costing') && !team;
+  const list = use.map(k => `- "## ${PLAN_SECTIONS[k][0]}": ${k === 'costing' ? 'see COSTING below' : PLAN_SECTIONS[k][1]}`).join('\n');
+  const costRule = costing
+    ? `COSTING: Give an indicative cost estimate in ${currency}, as a range per phase and a total range, built from the effort in your plan and typical market rates for this kind of work${persona === 'hardware' ? ' (include engineering, prototyping builds, components, testing and certification where relevant, and tooling or first production run if in scope)' : ''}. If the requirements state a budget, say whether the plan fits it and where it would be tight, and do not exceed it without saying so. List what is NOT included. Label it clearly as an estimate to be confirmed, not a fixed quote.`
+    : 'Do not give any prices, costs, rates, budgets or money amounts anywhere, and do not repeat any budget mentioned in the requirements. Effort and timeline only as ranges in weeks or person-days.';
   return `${PLAN_PERSONA[persona] || PLAN_PERSONA.software}
-Write a development plan for the project described in the client's requirements below.
-STYLE: plain, human and practical, as an experienced person would write it for a colleague. No hype, no filler, no AI-sounding phrases. Use short paragraphs and simple bullet points.
-CONTENT: ${persona === 'hardware' ? 'Phases with goals, deliverables and what must be true to move on; a timeline in weeks; roles needed; key components or long-lead items; risks and how to reduce them; assumptions and open questions.' : 'Phases with goals and deliverables; a timeline in weeks; roles needed; tech approach; risks and how to reduce them; assumptions and open questions.'} Give effort and timeline only as ranges in weeks or person-days. NEVER give prices, costs, rates, budgets or any money amounts, and do not repeat any budget mentioned in the requirements. Do not invent facts the requirements do not state; put gaps under "Open questions".
-${team ? 'AUDIENCE: the internal or outsourced delivery team. They must not learn who the client is. Never use the client name, company name, product or brand names, contact details, locations or any identifying detail; refer to "the client". Generalise anything that could identify them.' : 'AUDIENCE: the client. Address them directly and keep a confident, professional tone. You may use their project details, but still no prices or money amounts.'}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso: ' + custom : ''}
+Write a development plan for the project described in the requirements below.
+STYLE: plain, human and practical, as an experienced person would write it for a colleague. No hype, no filler, no AI-sounding phrases. Short paragraphs and simple bullet points.
+INCLUDE ONLY these sections, in this order, and nothing else:
+${list}
+${costRule}
+Do not invent facts the requirements do not state; put gaps under open questions when that section is included.
+${team ? 'AUDIENCE: the internal or outsourced delivery team. They must not learn who the client is. Never use the client name, company name, product or brand names, contact details, locations or any identifying detail; refer to "the client". Generalise anything that could identify them.' : 'AUDIENCE: the client. Address them directly and keep a confident, professional tone. You may use their project details.'}${termsLine(terms)}${rulesLine(rules)}${custom ? '\nAlso: ' + custom : ''}
 ${context ? 'Extra instructions: ' + context : ''}
-FORMAT: plain text only. Start each section with a line beginning "## " (for example "## Overview", "## Phases", "## Timeline", "## Team", "## Risks", "## Open questions"). Use "- " for bullets. No other markdown, no bold, no tables.
+FORMAT: plain text only. Start each section with a line beginning "## " followed by the section name exactly as given above. Use "- " for bullets. For costing you may use lines like "- Phase name: 4,000 to 6,000 ${currency}". No other markdown, no bold, no tables.
 
-Client requirements:
+Requirements:
 """
 ${text}
 """
@@ -248,8 +272,8 @@ ${text}
 Return ONLY this JSON (no markdown): { "clean_message": "the full plan as plain text" }`;
 }
 
-function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict, rules, persona, audience }) {
-  if (mode === 'plan') return planPrompt({ text, persona, audience, terms, rules, custom, context });
+function buildPrompt({ mode, text, hasImage, tags, custom, context, terms, clientName, tone, strict, rules, persona, audience, sections, currency }) {
+  if (mode === 'plan') return planPrompt({ text, persona, audience, terms, rules, custom, context, sections, currency });
   if (mode === 'reply') {
     return `${REPLY_RULES}
 Tone: ${tone}.
@@ -611,7 +635,7 @@ app.post('/api/declassify', requireAuth, express.json({ limit: '8mb' }), async (
   }
   const clientName = typeof b.clientName === 'string' ? b.clientName.trim().slice(0, 60) : '';
   const tone = ['friendly', 'professional', 'brief'].includes(b.tone) ? { friendly: 'warm and friendly', professional: 'formal and professional', brief: 'very short and direct' }[b.tone] : 'professional but warm';
-  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true, rules, persona: b.persona === 'hardware' ? 'hardware' : 'software', audience: b.audience === 'client' ? 'client' : 'team' });
+  const prompt = buildPrompt({ mode, text, hasImage: !!img, tags, custom, context, terms, clientName, tone, strict: mode === 'msg' && b.strict === true, rules, persona: b.persona === 'hardware' ? 'hardware' : 'software', audience: b.audience === 'client' ? 'client' : 'team', sections: Array.isArray(b.sections) ? b.sections.filter(k => typeof k === 'string').slice(0, 12) : [], currency: CURRENCIES.includes(b.currency) ? b.currency : 'USD' });
   const content = img
     ? [{ type: img.media_type === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: img.media_type, data: img.data.replace(/\s/g, '') } }, { type: 'text', text: prompt }]
     : [{ type: 'text', text: prompt }];

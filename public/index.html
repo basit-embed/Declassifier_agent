@@ -345,6 +345,11 @@
   .pi .kind{flex:none;font-size:11px;padding:2px 9px;border-radius:99px;border:1px solid var(--border2);color:var(--text2)}
   .pv{border:1px solid rgba(79,142,247,.4);border-radius:14px;background:var(--surface2);padding:14px;margin-bottom:12px}
   .pv-text{white-space:pre-wrap;font-size:14.5px;line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:10px 0}
+
+  .plan-secs{margin-top:12px}.lbl2{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+  .plan-secs .chip[disabled]{opacity:.4;cursor:not-allowed}
+  .plan-cur{margin-top:10px;font-size:12.5px;color:var(--text2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .plan-cur select{background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:5px 8px;font-family:var(--sans);font-size:12.5px}
   .history-section{margin-top:2rem}
   #vault-editor{position:fixed;z-index:950;left:50%;top:50%;transform:translate(-50%,-50%);width:min(520px,92vw);background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:1.25rem;margin:0;box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
   #vault-editor h3{font-size:15px;margin-bottom:10px}
@@ -502,6 +507,9 @@
             <div class="seg" id="plan-persona" role="group" aria-label="Specialist"><button class="on" data-v="software" onclick="planPick('persona',this)">Software / Web</button><button data-v="hardware" onclick="planPick('persona',this)">Hardware</button></div>
             <div class="seg" id="plan-aud" role="group" aria-label="Audience"><button class="on" data-v="team" onclick="planPick('aud',this)">For my team (cleaned)</button><button data-v="client" onclick="planPick('aud',this)">For the client</button></div>
             <button class="run-btn run" id="plan-btn" onclick="runPlan()" style="padding:9px 18px"><span id="plan-btn-label">Generate dev plan</span></button>
+          </div>
+          <div class="plan-secs"><div class="lbl2">Include in the plan</div><div class="chips" id="plan-secs"></div>
+            <div class="plan-cur" id="plan-cur" style="display:none">Costing currency <select id="plan-currency"><option>USD</option><option>AED</option><option>PKR</option><option>EUR</option><option>GBP</option><option>INR</option></select> <span id="plan-cost-note">Costing is an estimate for the client, built from the plan's effort. If the brief states a budget, the plan is checked against it.</span></div>
           </div>
           <div class="plan-out" id="plan-out">
             <div class="plan-doc" id="plan-doc"></div>
@@ -1376,7 +1384,21 @@ async function runAgent(opts) {
 
 // ── DEV PLAN (uses the same message as context) ──
 let planOpt = { persona:'software', aud:'team' }, planText = '';
-function planPick(k, btn) { planOpt[k]=btn.dataset.v; btn.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn)); }
+
+const PLAN_SECS = [['objectives','Objectives'],['scope','Scope & deliverables'],['phases','Phases'],['timeline','Timeline'],['team','Team & roles'],['costing','Costing'],['risks','Risks'],['assumptions','Assumptions & questions'],['components','Components & suppliers','hw'],['certification','Testing & certification','hw']];
+let planSecs = new Set(['objectives','scope','phases','timeline','team','risks','assumptions']);
+function renderPlanSecs() {
+  const hw = planOpt.persona==='hardware', team = planOpt.aud==='team';
+  if (team) planSecs.delete('costing');
+  document.getElementById('plan-secs').innerHTML = PLAN_SECS.filter(s=>hw || s[2]!=='hw').map(([k,l])=>{ const off = team && k==='costing';
+    return `<button class="chip ${planSecs.has(k)&&!off?'on':''}" ${off?'disabled title="Prices are never included in the team version"':''} onclick="togglePlanSec('${k}')">${l}</button>`; }).join('');
+  document.getElementById('plan-cur').style.display = (planSecs.has('costing') && !team) ? 'flex' : 'none';
+}
+function togglePlanSec(k) { if (planSecs.has(k)) planSecs.delete(k); else planSecs.add(k); renderPlanSecs(); }
+function planPick(k, btn) { planOpt[k]=btn.dataset.v; btn.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
+  if (k==='aud') { if (planOpt.aud==='client') planSecs.add('costing'); }
+  if (k==='persona' && planOpt.persona==='hardware') { planSecs.add('components'); planSecs.add('certification'); }
+  renderPlanSecs(); }
 function planHtml(t) {
   let out='', ul=false; const close=()=>{ if(ul){ out+='</ul>'; ul=false; } };
   t.split(/\r?\n/).forEach(raw=>{ const l=raw.trim(); if(!l){ close(); return; }
@@ -1390,7 +1412,9 @@ async function runPlan() {
   const btn=document.getElementById('plan-btn'), lab=document.getElementById('plan-btn-label'); btn.disabled=true; lab.textContent='Writing the plan… up to a minute';
   const payload = { mode:'plan', text:lastSource.slice(0,12000), persona:planOpt.persona, audience:planOpt.aud, tags:[],
     custom: document.getElementById('custom-rules').value.trim(), context: document.getElementById('team-context').value.trim(),
+    sections: [...planSecs], currency: document.getElementById('plan-currency').value,
     clientTerms: vaultTerms(), clientId: teamMode ? document.getElementById('vault-select').value : '' };
+  if (!payload.sections.length) { toast('Pick at least one section to include'); btn.disabled=false; lab.textContent='Generate dev plan'; return; }
   try {
     let timer; const timeout = new Promise((_,rej)=>{ timer=setTimeout(()=>rej(new Error('TIMEOUT')),170000); });
     const res = await Promise.race([timeout, api('/api/declassify', { method:'POST', headers:jsonHdr, body:JSON.stringify(payload) })]); clearTimeout(timer);
@@ -1399,7 +1423,7 @@ async function runPlan() {
     if (data.error || !res.ok) { const m=data.error&&(data.error.message||data.error); toast(m||('Server error ('+res.status+')'), 9000); return; }
     planText = data.result.clean_message || '';
     document.getElementById('plan-doc').innerHTML = planHtml(planText);
-    document.getElementById('plan-note').textContent = (planOpt.aud==='team' ? 'Team version: client name, company, prices and contact details are removed. ' : 'Client version: no prices are included. ') + 'This is a draft. Check timelines before you send it.';
+    document.getElementById('plan-note').textContent = (planOpt.aud==='team' ? 'Team version: client name, company, prices and contact details are removed. ' : (planSecs.has('costing') ? 'Client version: costing is an estimate. Confirm it before you send. ' : 'Client version. ')) + 'This is a draft. Check timelines before you send it.';
     document.getElementById('plan-out').classList.add('show');
     saveToProject('plan', 'Dev plan · ' + (planOpt.persona==='hardware'?'Hardware':'Software') + ' · ' + (planOpt.aud==='team'?'team version':'client version'), planText, { persona: planOpt.persona, audience: planOpt.aud });
   } catch(err) { toast(err.message==='TIMEOUT' ? 'Timed out. Please try again.' : 'Error: '+err.message); }
@@ -1478,7 +1502,7 @@ function renderOutput(d) {
   }
   const reply = d._mode==='reply';
   document.getElementById('review').classList.remove('open');
-  document.getElementById('plan-box').style.display = (reply || !lastSource) ? 'none' : ''; document.getElementById('plan-out').classList.remove('show'); planText='';
+  renderPlanSecs(); document.getElementById('plan-box').style.display = (reply || !lastSource) ? 'none' : ''; document.getElementById('plan-out').classList.remove('show'); planText='';
   document.getElementById('review-btn').style.display = (reply || !lastSource) ? 'none' : '';
   document.getElementById('orig-btn').style.display = (!reply && srcFile && document.getElementById('msg-input').value.trim() ? '' : 'none');
   document.getElementById('more-details').style.display = reply ? 'none' : '';

@@ -325,9 +325,15 @@
   .plan-doc p{margin:0 0 8px}.plan-doc ul{margin:0 0 8px 18px;padding:0}
   .plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 
-  .projbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-  .projbar .chip select{max-width:260px}
-  .proj-hint{font-size:12px;color:var(--text3)}
+  .projbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 0 12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .pb-left{display:flex;align-items:center;gap:10px;min-width:0}
+  .pb-label{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);flex:none}
+  .projbar select{background:transparent;color:var(--text);border:0;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;outline:none;max-width:min(300px,52vw);padding:2px 0;text-overflow:ellipsis}
+  .projbar select option{background:var(--surface2);color:var(--text);font-weight:400}
+  .pb-right{display:flex;align-items:center;gap:14px;flex:none}
+  .pb-link{background:none;border:0;color:var(--text2);font-family:var(--sans);font-size:12.5px;cursor:pointer;padding:2px 0}
+  .pb-link:hover{color:var(--text)}.pb-link.accent{color:var(--accent)}.pb-link.danger:hover{color:var(--red,#e85c5c)}
+  #proj-actions{display:inline-flex;gap:14px}
   .projnew{display:none;gap:8px;flex-wrap:wrap;margin:0 0 12px;align-items:center}
   .projnew.open{display:flex}
   .projnew input,.projnew select{background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-family:var(--sans);font-size:13.5px;min-width:0}
@@ -409,17 +415,17 @@
     <p>Paste a message, drop a PDF, Word file or screenshot, or press Ctrl+V anywhere. Sensitive details light up before you send.</p>
   </div>
 
-  <div class="projbar" id="projbar">
-    <label class="chip" title="Group runs, dev plans and the saved client by project">📁 <select id="project-select" onchange="onProjectChange()" aria-label="Project"></select></label>
-    <span id="proj-actions" style="display:none"><button class="chip" onclick="projRename()">Rename</button> <button class="chip" onclick="projDelete()">Delete</button></span>
-    <span class="proj-hint" id="proj-hint"></span>
-  </div>
-  <div class="projnew" id="projnew">
-    <input id="projnew-name" maxlength="80" placeholder="Project name, e.g. Smart lock prototype" onkeydown="if(event.key==='Enter'){event.preventDefault();projCreate();}" />
-    <select id="projnew-client" aria-label="Saved client for this project"></select>
-    <button class="vault-btn" onclick="projCreate()">Create</button><button class="vault-btn" onclick="projNewClose()">Cancel</button>
-  </div>
   <div class="bar" id="cmd-bar">
+    <div class="projbar" id="projbar">
+      <div class="pb-left"><span class="pb-label">Project</span>
+        <select id="project-select" onchange="onProjectChange()" aria-label="Project"></select></div>
+      <div class="pb-right"><span id="proj-actions" style="display:none"><button class="pb-link" onclick="projRename()">Rename</button><button class="pb-link danger" onclick="projDelete()">Delete</button></span><button class="pb-link accent" onclick="projNewOpen()">+ New project</button></div>
+    </div>
+    <div class="projnew" id="projnew">
+      <input id="projnew-name" maxlength="80" placeholder="Project name, e.g. Smart lock prototype" onkeydown="if(event.key==='Enter'){event.preventDefault();projCreate();}" />
+      <select id="projnew-client" aria-label="Saved client for this project"></select>
+      <button class="vault-btn" onclick="projCreate()">Create</button><button class="vault-btn" onclick="projNewClose()">Cancel</button>
+    </div>
     <div class="shot" id="shot-wrap">
       <img id="img-preview" alt="Attached screenshot" />
       <div><b>File attached</b><span>It will be read and cleaned.</span></div>
@@ -1240,11 +1246,11 @@ async function loadProjects() {
 }
 function renderProjectSelect() {
   const sel = document.getElementById('project-select');
-  sel.innerHTML = '<option value="">No project</option>' + PROJ.list.map(p=>`<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('') + '<option value="__new">+ New project…</option>';
+  sel.innerHTML = '<option value="">None (optional)</option>' + PROJ.list.map(p=>`<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('');
   sel.value = PROJ.active || '';
   document.getElementById('proj-actions').style.display = PROJ.active ? '' : 'none';
   const p = PROJ.list.find(x=>x.id===PROJ.active);
-  document.getElementById('proj-hint').textContent = p ? 'Every run and dev plan is saved here (cleaned text only).' : 'Optional: group your work by project.';
+  const sel2 = document.getElementById('project-select'); sel2.title = p ? 'Every run and dev plan is saved to this project (cleaned text only).' : 'Optional: group your work by project.';
 }
 function onProjectChange() {
   const v = document.getElementById('project-select').value;
